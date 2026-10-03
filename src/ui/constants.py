@@ -19,6 +19,9 @@ APP_VERSION   = "7.1.0"
 # Auto-refresh debounce: ms to wait after last param change before rebuilding DMD
 DMD_REFRESH_DELAY_MS = 1800
 
+# Resolution presets are discrete choices, so the preview follows almost immediately
+RESOLUTION_REFRESH_DELAY_MS = 150
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 

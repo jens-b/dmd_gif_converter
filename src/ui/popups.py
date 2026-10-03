@@ -2,6 +2,8 @@ import customtkinter as ctk
 import tkinter as tk
 import re
 
+from src.ui.i18n import localize_widget_tree, tr
+
 def adv_slider(par, label, var, from_, to, fmt="{:.2f}", suffix="",
                steps=None, is_int=False, lmh=True, auto_var=None):
     f = ctk.CTkFrame(par, fg_color="transparent")
@@ -78,7 +80,7 @@ def adv_slider(par, label, var, from_, to, fmt="{:.2f}", suffix="",
 class TextOverlayPopup(ctk.CTkToplevel):
     def __init__(self, master, app_state):
         super().__init__(master)
-        self.title("Text Overlay Settings")
+        self.title(tr("Text Overlay Settings"))
         self.geometry("450x380")
         self.resizable(False, False)
         
@@ -87,6 +89,7 @@ class TextOverlayPopup(ctk.CTkToplevel):
 
         self._app_state = app_state
         self._build_ui()
+        localize_widget_tree(self)
 
     def _build_ui(self):
         container = ctk.CTkFrame(self, fg_color="#16213e", corner_radius=6)
@@ -231,7 +234,7 @@ class TextOverlayPopup(ctk.CTkToplevel):
 class AutoActionPopup(ctk.CTkToplevel):
     def __init__(self, master, app_state):
         super().__init__(master)
-        self.title("Auto-Action & Video Cutter Settings")
+        self.title(tr("Auto-Action & Video Cutter Settings"))
         self.geometry("500x550")
         self.resizable(False, False)
         
@@ -241,6 +244,7 @@ class AutoActionPopup(ctk.CTkToplevel):
 
         self._app_state = app_state
         self._build_ui()
+        localize_widget_tree(self)
 
     def _build_ui(self):
         container = ctk.CTkFrame(self, fg_color="#16213e", corner_radius=6)

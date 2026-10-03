@@ -367,7 +367,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._src_canvas.delete("all")
         cw = max(20, self._src_canvas.winfo_width()) if self._src_canvas.winfo_width() > 10 else SRC_CANVAS_W
         self._src_canvas.create_text(cw // 2, getattr(self, "_last_src_h", SRC_CANVAS_H) // 2,
-                                     text="← Select a file to preview",
+                                     text=tr("← Select a file to preview"),
                                      fill="#445566", font=("Helvetica", 12), justify="center",
                                      width=cw - 20, tags="info_text")
         if hasattr(self, "_src_info"):
@@ -377,7 +377,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._auto_canvas.delete("all")
         cw = max(20, self._auto_canvas.winfo_width()) if self._auto_canvas.winfo_width() > 10 else AUTO_CANVAS_W
         self._auto_canvas.create_text(cw // 2, getattr(self, "_last_auto_h", AUTO_CANVAS_H) // 2,
-                                      text="Auto action preview\n(disabled by default)",
+                                      text=tr("Auto action preview\n(disabled by default)"),
                                       fill="#334466", font=("Helvetica", 11), justify="center",
                                       width=cw - 20, tags="info_text")
         if hasattr(self, "_auto_info"):
@@ -390,7 +390,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         except Exception:
             cw, ch = int(128 * DMD_DISPLAY_SCALE_FACTOR), int(32 * DMD_DISPLAY_SCALE_FACTOR)
         self._dmd_canvas.create_text(cw // 2, ch // 2,
-                                     text="← Select a file then\n  click 🔬 Refresh DMD",
+                                     text=tr("← Select a file then\n  click 🔬 Refresh DMD"),
                                      fill="#334455", font=("Helvetica", 11), justify="center",
                                      width=cw - 20, tags="info_text")
         if hasattr(self, "_dmd_info"):
@@ -408,7 +408,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             c.delete("all")
         cw = max(20, self._src_canvas.winfo_width()) if self._src_canvas.winfo_width() > 10 else SRC_CANVAS_W
         self._src_canvas.create_text(cw // 2, getattr(self, "_last_src_h", SRC_CANVAS_H) // 2,
-                                     text="⏳  Loading preview…",
+                                     text=tr("⏳  Loading preview…"),
                                      fill="#7ec8e3", font=("Helvetica", 12), justify="center",
                                      width=cw - 20, tags="info_text")
         self._source_width, self._source_height, _, dur = get_metadata(file_path)
@@ -511,7 +511,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             self._src_canvas.delete("all")
             cw = max(20, self._src_canvas.winfo_width()) if self._src_canvas.winfo_width() > 10 else SRC_CANVAS_W
             self._src_canvas.create_text(cw // 2, getattr(self, "_last_src_h", SRC_CANVAS_H) // 2,
-                                         text="⚠️  Preview unavailable\n(ffmpeg missing?)",
+                                         text=tr("⚠️  Preview unavailable\n(ffmpeg missing?)"),
                                          fill="#e74c3c", font=("Helvetica", 11), justify="center",
                                          width=cw - 20, tags="info_text")
             if tmpdir:
@@ -610,13 +610,13 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             self._auto_rendering = False
             self._stop_auto_preview()
             self._show_static_auto_preview(src)
-            self._auto_info.configure(text="Standbild · Auto-Action nicht erforderlich")
+            self._auto_info.configure(text=tr("Standbild · Auto-Action nicht erforderlich"))
             self._start_dmd_generation(src)
             return
         if not self.app_state.v_action_enabled.get():
             self._stop_auto_preview()
             self._draw_auto_canvas_idle()
-            self._auto_info.configure(text="Auto action disabled")
+            self._auto_info.configure(text=tr("Auto action disabled"))
             return
         self._auto_pending_src = None
         self._auto_rendering = True
@@ -624,10 +624,10 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._auto_canvas.delete("all")
         cw = max(20, self._auto_canvas.winfo_width()) if self._auto_canvas.winfo_width() > 10 else AUTO_CANVAS_W
         self._auto_canvas.create_text(cw // 2, getattr(self, "_last_auto_h", AUTO_CANVAS_H) // 2,
-                                      text="⏳  Generating auto-action preview…",
+                                      text=tr("⏳  Generating auto-action preview…"),
                                       fill="#7aa2ff", font=("Helvetica", 11), justify="center",
                                       width=cw - 20, tags="info_text")
-        self.panel.controls._btn_auto.configure(state="disabled", text="⏳ Auto…")
+        self.panel.controls._btn_auto.configure(state="disabled", text=tr("⏳ Auto…"))
         start_s, end_s = self.panel._get_trim()
         s = self.app_state
         
@@ -758,7 +758,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             self._auto_tmpdir = None
         cw = max(20, self._auto_canvas.winfo_width()) if self._auto_canvas.winfo_width() > 10 else AUTO_CANVAS_W
         self._auto_canvas.create_text(cw // 2, getattr(self, "_last_auto_h", AUTO_CANVAS_H) // 2,
-                                      text="❌  Auto-action failed",
+                                      text=tr("❌  Auto-action failed"),
                                       fill="#e74c3c", font=("Helvetica", 11), justify="center",
                                       width=cw - 20, tags="info_text")
         self._auto_info.configure(text=msg)
@@ -778,10 +778,10 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._auto_canvas.delete("all")
         cw = max(20, self._auto_canvas.winfo_width()) if self._auto_canvas.winfo_width() > 10 else AUTO_CANVAS_W
         self._auto_canvas.create_text(cw // 2, getattr(self, "_last_auto_h", AUTO_CANVAS_H) // 2,
-                                      text="⏭️  Bypassed\n(Original or perfect ratio)",
+                                      text=tr("⏭️  Bypassed\n(Original or perfect ratio)"),
                                       fill="#2ecc71", font=("Helvetica", 12), justify="center",
                                       width=cw - 20, tags="info_text")
-        self._auto_info.configure(text="Auto Action is skipped. Color Boost & FPS only.")
+        self._auto_info.configure(text=tr("Auto Action is skipped. Color Boost & FPS only."))
         self._flush_auto_pending()
         
         # Chain to DMD generation
@@ -805,7 +805,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             self._auto_canvas.delete("all")
             self._auto_canvas.create_text(
                 AUTO_CANVAS_W // 2, AUTO_CANVAS_H // 2,
-                text="Standbild-Vorschau nicht verfügbar",
+                text=tr("Standbild-Vorschau nicht verfügbar"),
                 fill="#e74c3c", font=("Helvetica", 11), justify="center",
             )
 
@@ -883,7 +883,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             return
         self._dmd_pending_src = None
         self._dmd_rendering = True
-        self.panel.controls._btn_dmd.configure(state="disabled", text="⏳ DMD…")
+        self.panel.controls._btn_dmd.configure(state="disabled", text=tr("⏳ DMD…"))
         # Always sync canvas size before computing frame dimensions
         self._update_dmd_canvas_size()
         try:
@@ -1044,7 +1044,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         except Exception:
             cw, ch = int(128 * DMD_DISPLAY_SCALE_FACTOR), int(32 * DMD_DISPLAY_SCALE_FACTOR)
         self._dmd_canvas.create_text(cw // 2, ch // 2,
-                                     text="❌  DMD render failed",
+                                     text=tr("❌  DMD render failed"),
                                      fill="#e74c3c", font=("Helvetica", 11), justify="center",
                                      width=cw - 20, tags="info_text")
         logger.error("DMD preview: %s", msg)

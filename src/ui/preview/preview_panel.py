@@ -31,7 +31,7 @@ from src.ui.constants import (
     SRC_CANVAS_W, SRC_CANVAS_H,
     AUTO_CANVAS_W, AUTO_CANVAS_H,
     DMD_DISPLAY_SCALE_FACTOR,
-    DMD_REFRESH_DELAY_MS,
+    DMD_REFRESH_DELAY_MS, RESOLUTION_REFRESH_DELAY_MS,
 )
 from src.ui.dmd_led_sim import (
     LED_SIM_SCALE, LED_SIM_GAP, LED_SIM_MAX_W,
@@ -168,13 +168,17 @@ class PreviewPanel(ctk.CTkFrame):
         self.controls._lbl_end.configure(text=f"{dur:.1f} s")
         self.controls._sl_end.configure(state="normal")
 
-    def _invalidate_auto_cache_and_refresh(self):
+    def _invalidate_auto_cache_and_refresh(self, delay_ms: int = DMD_REFRESH_DELAY_MS):
         if getattr(self.player, "_auto_tmpdir", None):
             import shutil, os
             if os.path.isdir(self.player._auto_tmpdir):
                 shutil.rmtree(self.player._auto_tmpdir, ignore_errors=True)
             self.player._auto_tmpdir = None
-        self._schedule_pipeline_refresh()
+        self._schedule_pipeline_refresh(delay_ms=delay_ms)
+
+    def refresh_for_resolution_change(self):
+        """Re-render auto-action and DMD previews quickly after the target size changed."""
+        self._invalidate_auto_cache_and_refresh(delay_ms=RESOLUTION_REFRESH_DELAY_MS)
 
     def _on_start_drag(self, val):
         v = float(val)
@@ -208,12 +212,12 @@ class PreviewPanel(ctk.CTkFrame):
     #  DEBOUNCED REFRESH
     # ══════════════════════════════════════════════════════════════════════════
 
-    def _schedule_pipeline_refresh(self, *_):
+    def _schedule_pipeline_refresh(self, *_, delay_ms: int = DMD_REFRESH_DELAY_MS):
         if self._restoring_params:
             return
         if self._adv_refresh_job:
             self.after_cancel(self._adv_refresh_job)
-        self._adv_refresh_job = self.after(DMD_REFRESH_DELAY_MS, self._auto_refresh_pipeline)
+        self._adv_refresh_job = self.after(delay_ms, self._auto_refresh_pipeline)
 
     def _schedule_dmd_only_refresh(self, *_):
         if self._restoring_params:
@@ -349,7 +353,7 @@ class PreviewPanel(ctk.CTkFrame):
         if self._busy:
             messagebox.showwarning(tr("Busy"), tr("A conversion is already running."))
             return
-        folder_in = filedialog.askdirectory(title="Source folder — Batch")
+        folder_in = filedialog.askdirectory(title=tr("Source folder — Batch"))
         if not folder_in:
             return
         out_dir = self._choose_output_folder()

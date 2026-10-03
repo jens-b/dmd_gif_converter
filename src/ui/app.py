@@ -106,7 +106,6 @@ class DMDConverterApp(ctk.CTk):
         
         # Trigger auto-refresh for visual parameters
         refresh_vars = [
-            "v_target_width", "v_target_height",
             "v_text_overlay_enabled", "v_text_content", "v_text_font_size",
             "v_text_color", "v_text_position", "v_text_style", "v_text_animation",
             "v_text_bg", "v_text_bg_opacity", "v_text_font_file"
@@ -115,6 +114,11 @@ class DMDConverterApp(ctk.CTk):
             var = getattr(self.app_state, v_name, None)
             if var:
                 var.trace_add("write", lambda *_: self.preview_controller.schedule_refresh())
+
+        for v_name in ("v_target_width", "v_target_height", "v_static_image_mode"):
+            getattr(self.app_state, v_name).trace_add(
+                "write", lambda *_: self.preview_panel.refresh_for_resolution_change()
+            )
 
         self.left_panel.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         self.preview_panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)

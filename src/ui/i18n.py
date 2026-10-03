@@ -345,6 +345,10 @@ _DE_TO_EN = {
     "ScreenScraper-Medien suchen": "Search ScreenScraper media",
     "Bereit.": "Ready.",
 }
+from src.ui.i18n_extra import DE_TO_EN as _EXTRA_DE_TO_EN, EN_TO_DE as _EXTRA_EN_TO_DE
+
+_EN_TO_DE.update(_EXTRA_EN_TO_DE)
+_DE_TO_EN.update(_EXTRA_DE_TO_EN)
 _DE_TO_EN_REVERSE = {value: key for key, value in _EN_TO_DE.items()}
 
 
