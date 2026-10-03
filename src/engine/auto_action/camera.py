@@ -86,6 +86,24 @@ def _build_camera_rect(frame_w: int, frame_h: int, roi, cfg: AutoActionConfig,
         crop_w = max_w
         crop_h = max_h
 
+    use_dynamic_zoom = (
+        0.49 <= target_ratio <= 0.51
+        or getattr(cfg, "dynamic_zoom_all_sizes", False)
+    )
+    if roi is not None and use_dynamic_zoom:
+        _, _, roi_w, roi_h = roi
+        padding = max(0.0, float(getattr(cfg, "padding", 0.20)))
+        required_w = max(
+            float(roi_w) * (1.0 + 2.0 * padding),
+            float(roi_h) * target_ratio * (1.0 + 2.0 * padding),
+        )
+        zoom_max = max(1.0, float(getattr(cfg, "zoom_max", 2.0)))
+        zoom = min(zoom_max, max(1.0, max_w / max(1.0, required_w)))
+        crop_w = max_w / zoom
+        crop_h = crop_w / target_ratio
+        if locked_crop_size is None:
+            crop_w = min(crop_w, float(effective_frame_w))
+            crop_h = min(crop_h, float(effective_frame_h))
 
     if roi is None:
         cx = effective_frame_left + effective_frame_w / 2.0
@@ -132,11 +150,10 @@ def _smooth(prev, curr, smoothness: float):
     if prev is None:
         return curr
     a = _clamp(smoothness, 0.0, 0.98)
-    # Smooth ONLY camera translation (cx, cy). Keep camera crop dimensions (cw, ch) strictly static.
     cx = (a * prev[0]) + ((1.0 - a) * curr[0])
     cy = (a * prev[1]) + ((1.0 - a) * curr[1])
-    cw = curr[2]
-    ch = curr[3]
+    cw = (a * prev[2]) + ((1.0 - a) * curr[2])
+    ch = (a * prev[3]) + ((1.0 - a) * curr[3])
     return CamRect(cx, cy, cw, ch)
 
 

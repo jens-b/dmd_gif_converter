@@ -6,7 +6,9 @@ import customtkinter as ctk
 from pathlib import Path
 from tkinter import messagebox
 
+from src.ui.constants import STATIC_IMAGE_MODE_LABELS
 from src.ui.events.event_bus import EventBus, EventType
+from src.ui.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +22,14 @@ class MiddlePanel(ctk.CTkFrame):
         self._selected_converted_iid: str = ""
         self._build_ui()
 
-
-    def browse_output(self):
-        d = tk.filedialog.askdirectory(title="Select output folder", initialdir=self.app_state.v_output_dir.get())
+    def _browse_final_destination(self):
+        current = self.app_state.v_final_destination_dir.get().strip()
+        d = tk.filedialog.askdirectory(
+            title=tr("Select output folder"),
+            initialdir=current or None,
+        )
         if d:
-            self.app_state.v_output_dir.set(d)
+            self.app_state.v_final_destination_dir.set(d)
 
     def _build_ui(self):
         mp = self
@@ -39,7 +44,7 @@ class MiddlePanel(ctk.CTkFrame):
         
         self._lmh_cb = ctk.CTkCheckBox(
             qs,
-            text="🤖 Let me handle it (Auto)",
+            text=tr("🤖 Let me handle it (Auto)"),
             variable=self.app_state.v_let_me_handle_it,
             font=ctk.CTkFont(size=12, weight="bold"), text_color="#ffaa22",
             fg_color="#cc7700", hover_color="#ff9900"
@@ -47,7 +52,7 @@ class MiddlePanel(ctk.CTkFrame):
         self._lmh_cb.grid(row=0, column=0, padx=10, pady=8, sticky="w")
         
         ctk.CTkButton(
-            qs, text="⚙️ Advanced", width=90, height=24,
+            qs, text="⚙️ " + tr("Advanced Settings"), width=120, height=24,
             command=self._open_advanced_settings,
             fg_color="#3a3a4a", hover_color="#5a5a6a"
         ).grid(row=0, column=1, padx=10, pady=8, sticky="e")
@@ -57,7 +62,7 @@ class MiddlePanel(ctk.CTkFrame):
         res_frame.grid(row=1, column=0, padx=10, pady=(2, 8), sticky="ew")
         res_frame.grid_columnconfigure(1, weight=1)
         
-        ctk.CTkLabel(res_frame, text="Resolution:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", padx=(0, 6))
+        ctk.CTkLabel(res_frame, text=tr("Resolution:"), font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", padx=(0, 6))
         self._target_preset_menu = ctk.CTkOptionMenu(
             res_frame,
             variable=self.app_state.v_target_preset,
@@ -66,6 +71,29 @@ class MiddlePanel(ctk.CTkFrame):
             height=24
         )
         self._target_preset_menu.grid(row=0, column=1, sticky="ew")
+
+        ctk.CTkLabel(
+            res_frame, text="PNG-Darstellung:", font=ctk.CTkFont(size=11)
+        ).grid(row=1, column=0, sticky="w", padx=(0, 6), pady=(4, 0))
+        label_for_mode = {
+            mode: label for label, mode in STATIC_IMAGE_MODE_LABELS.items()
+        }
+        self._static_image_mode_var = tk.StringVar(
+            value=label_for_mode.get(self.app_state.v_static_image_mode.get(), "Strecken")
+        )
+        self._static_image_mode_menu = ctk.CTkOptionMenu(
+            res_frame,
+            variable=self._static_image_mode_var,
+            values=list(STATIC_IMAGE_MODE_LABELS),
+            command=self._on_static_image_mode_change,
+            height=24,
+        )
+        self._static_image_mode_menu.grid(
+            row=1, column=1, sticky="ew", pady=(4, 0)
+        )
+        self.app_state.v_static_image_mode.trace_add(
+            "write", self._sync_static_image_mode
+        )
 
         # Custom inputs
         self._custom_res_frame = ctk.CTkFrame(res_frame, fg_color="transparent")
@@ -84,17 +112,17 @@ class MiddlePanel(ctk.CTkFrame):
         hdr.grid(row=2, column=0, padx=10, pady=(8, 4), sticky="ew")
         hdr.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            hdr, text="✅  Converted Files",
+            hdr, text="3️⃣ " + tr("✅  Converted Files"),
             font=ctk.CTkFont(size=15, weight="bold")
         ).grid(row=0, column=0, sticky="w")
         
         self._converted_count_lbl = ctk.CTkLabel(
-            hdr, text="empty", text_color="#666688", font=ctk.CTkFont(size=11)
+            hdr, text=tr("empty"), text_color="#666688", font=ctk.CTkFont(size=11)
         )
         self._converted_count_lbl.grid(row=0, column=1, sticky="e", padx=(0, 8))
 
         ctk.CTkButton(
-            hdr, text="Clear", width=40, height=20, font=ctk.CTkFont(size=10),
+            hdr, text=tr("Clear"), width=60, height=20, font=ctk.CTkFont(size=10),
             command=self._clear_converted, fg_color="#3a3a4a", hover_color="#c0392b"
         ).grid(row=0, column=2, sticky="e")
 
@@ -134,7 +162,7 @@ class MiddlePanel(ctk.CTkFrame):
         self.app_state.v_search_converted = tk.StringVar(value="")
         search_entry = ctk.CTkEntry(
             filter_frame, textvariable=self.app_state.v_search_converted,
-            placeholder_text="Search...", height=26
+            placeholder_text=tr("Search..."), height=26
         )
         search_entry.grid(row=0, column=1, sticky="ew")
         search_entry.bind("<KeyRelease>", self._on_filter_changed)
@@ -181,51 +209,66 @@ class MiddlePanel(ctk.CTkFrame):
         cleanup_frame.grid(row=6, column=0, padx=8, pady=(4, 8), sticky="ew")
         cleanup_frame.grid_columnconfigure(0, weight=1)
         
-        ctk.CTkLabel(cleanup_frame, text="🧹 Cleanup Assistant", font=ctk.CTkFont(size=12, weight="bold"), text_color="#7ec8e3").grid(row=0, column=0, columnspan=2, padx=8, pady=(4, 0), sticky="w")
+        ctk.CTkLabel(cleanup_frame, text=tr("🧹 Cleanup Assistant"), font=ctk.CTkFont(size=12, weight="bold"), text_color="#7ec8e3").grid(row=0, column=0, columnspan=2, padx=8, pady=(4, 0), sticky="w")
         
-        ctk.CTkButton(cleanup_frame, text="Trash Red (<=30%)", fg_color="#e74c3c", hover_color="#c0392b", height=24, font=ctk.CTkFont(size=11), command=lambda: self._cleanup_by_score(30)).grid(row=1, column=0, padx=(8, 2), pady=(4, 6), sticky="ew")
-        ctk.CTkButton(cleanup_frame, text="Trash <=50%", fg_color="#e67e22", hover_color="#d35400", height=24, font=ctk.CTkFont(size=11), command=lambda: self._cleanup_by_score(50)).grid(row=1, column=1, padx=(2, 8), pady=(4, 6), sticky="ew")
+        ctk.CTkButton(cleanup_frame, text=tr("Trash Red (<=30%)"), fg_color="#e74c3c", hover_color="#c0392b", height=24, font=ctk.CTkFont(size=11), command=lambda: self._cleanup_by_score(30)).grid(row=1, column=0, padx=(8, 2), pady=(4, 6), sticky="ew")
+        ctk.CTkButton(cleanup_frame, text=tr("Trash <=50%"), fg_color="#e67e22", hover_color="#d35400", height=24, font=ctk.CTkFont(size=11), command=lambda: self._cleanup_by_score(50)).grid(row=1, column=1, padx=(2, 8), pady=(4, 6), sticky="ew")
 
         # Custom cleanup
         custom_frame = ctk.CTkFrame(cleanup_frame, fg_color="transparent")
         custom_frame.grid(row=2, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="ew")
         custom_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(custom_frame, text="Trash <=", font=ctk.CTkFont(size=11)).grid(row=0, column=0, padx=(0,4))
+        ctk.CTkLabel(custom_frame, text=tr("Trash <="), font=ctk.CTkFont(size=11)).grid(row=0, column=0, padx=(0,4))
         
         self.app_state.v_cleanup_custom = tk.StringVar(value="70")
         custom_entry = ctk.CTkEntry(custom_frame, textvariable=self.app_state.v_cleanup_custom, width=40, height=24)
         custom_entry.grid(row=0, column=1, sticky="w")
         
         ctk.CTkLabel(custom_frame, text="%", font=ctk.CTkFont(size=11)).grid(row=0, column=2, padx=(2,4))
-        ctk.CTkButton(custom_frame, text="Trash Custom", fg_color="#8e44ad", hover_color="#732d91", height=24, width=80, font=ctk.CTkFont(size=11), command=self._cleanup_custom).grid(row=0, column=3, padx=(4,0))
+        ctk.CTkButton(custom_frame, text=tr("Trash Custom"), fg_color="#8e44ad", hover_color="#732d91", height=24, width=80, font=ctk.CTkFont(size=11), command=self._cleanup_custom).grid(row=0, column=3, padx=(4,0))
 
         # ── Destination Folder ──────────────────────────────────────────────
         dest_frame = ctk.CTkFrame(mp, fg_color="transparent")
         dest_frame.grid(row=7, column=0, padx=8, pady=(0, 8), sticky="ew")
         dest_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(dest_frame, text="📤 Output / Destination folder", font=ctk.CTkFont(size=12, weight="bold")).grid(
-            row=0, column=0, columnspan=2, padx=4, pady=(2, 2), sticky="w"
-        )
-        
-        of = ctk.CTkFrame(dest_frame, fg_color="transparent")
-        of.grid(row=1, column=0, columnspan=2, sticky="ew")
-        of.grid_columnconfigure(0, weight=1)
-        
+        ctk.CTkLabel(
+            dest_frame, text="4️⃣ 🚚 " + tr("Move good files to final destination"),
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).grid(row=0, column=0, columnspan=2, padx=4, pady=(2, 2), sticky="w")
+
+        ctk.CTkLabel(
+            dest_frame,
+            text=tr(
+                "This is a separate folder from the workshop folder above —"
+                " e.g. your Batocera share or USB stick. Files are only"
+                " moved here when you click the button below."
+            ),
+            font=ctk.CTkFont(size=10),
+            text_color="#8888aa",
+            justify="left",
+            wraplength=280,
+        ).grid(row=1, column=0, columnspan=2, padx=4, pady=(0, 4), sticky="w")
+
+        dest_entry_row = ctk.CTkFrame(dest_frame, fg_color="transparent")
+        dest_entry_row.grid(row=2, column=0, columnspan=2, sticky="ew")
+        dest_entry_row.grid_columnconfigure(0, weight=1)
+
         ctk.CTkEntry(
-            of, textvariable=self.app_state.v_output_dir,
-            placeholder_text="(same folder as source)", height=28
+            dest_entry_row, textvariable=self.app_state.v_final_destination_dir,
+            placeholder_text=tr("Choose a final destination folder to enable moving files there."),
+            height=28,
         ).grid(row=0, column=0, padx=(4, 2), sticky="ew")
-        
+
         ctk.CTkButton(
-            of, text="…", width=28, height=28, command=self.browse_output
+            dest_entry_row, text="…", width=28, height=28, command=self._browse_final_destination
         ).grid(row=0, column=1, padx=(0, 4))
 
         ctk.CTkButton(
-            dest_frame, text="🚚 Move Converted & Clear List",
+            dest_frame, text=tr("🚚 Move Converted & Clear List"),
             height=28, command=self._move_and_clear_converted,
             fg_color="#1a4f7a", hover_color="#1a618d", font=ctk.CTkFont(size=12, weight="bold")
-        ).grid(row=2, column=0, columnspan=2, padx=4, pady=(6, 4), sticky="ew")
+        ).grid(row=3, column=0, columnspan=2, padx=4, pady=(6, 4), sticky="ew")
 
     def _style_converted_treeview(self):
         s = ttk.Style()
@@ -275,6 +318,19 @@ class MiddlePanel(ctk.CTkFrame):
             self._custom_res_frame.grid_forget()
         else:
             self._custom_res_frame.grid(row=2, column=0, columnspan=2, pady=4, sticky="ew")
+
+    def _on_static_image_mode_change(self, label):
+        mode = STATIC_IMAGE_MODE_LABELS.get(label)
+        if mode:
+            self.app_state.v_static_image_mode.set(mode)
+
+    def _sync_static_image_mode(self, *_):
+        mode = self.app_state.v_static_image_mode.get()
+        label = next(
+            (label for label, value in STATIC_IMAGE_MODE_LABELS.items() if value == mode),
+            "Strecken",
+        )
+        self._static_image_mode_var.set(label)
 
     def _update_converted_count(self):
         n = len(self._converted_data)
@@ -359,77 +415,139 @@ class MiddlePanel(ctk.CTkFrame):
             import send2trash
             safe_delete = send2trash.send2trash
         except ImportError:
-            self._log("send2trash module missing. Deleting permanently instead.", "warning")
-            safe_delete = os.remove
+            messagebox.showerror(
+                "Cannot move to trash",
+                "The system-trash integration is unavailable. No files were deleted.",
+            )
+            return
             
-        for data in self._converted_data.values():
+        removed = []
+        failures = []
+        for iid, data in list(self._converted_data.items()):
             path = data["path"]
             if os.path.exists(path):
-                try: safe_delete(path)
-                except: pass
+                try:
+                    safe_delete(path)
+                except Exception as exc:
+                    failures.append((path, exc))
+                    continue
             sidecar = path + ".scores.json"
             if os.path.exists(sidecar):
-                try: safe_delete(sidecar)
-                except: pass
+                try:
+                    safe_delete(sidecar)
+                except Exception as exc:
+                    self._log(f"Could not move score data to trash for {path}: {exc}", "warning")
+            removed.append(iid)
 
-        children = self._tree_converted.get_children()
-        if children:
-            self._tree_converted.delete(*children)
-        self._converted_data.clear()
-        self._converted_paths.clear()
+        for iid in removed:
+            self._converted_data.pop(iid, None)
+        self._converted_paths = {
+            data["path"] for data in self._converted_data.values()
+        }
+        children = set(self._tree_converted.get_children())
+        visible_removed = [iid for iid in removed if iid in children]
+        if visible_removed:
+            self._tree_converted.delete(*visible_removed)
         self._update_converted_count()
         self._update_statistics()
-        self._selected_converted_iid = ""
+        if self._selected_converted_iid in removed:
+            self._selected_converted_iid = ""
+        if failures:
+            messagebox.showwarning(
+                "Some files could not be moved",
+                f"{len(failures)} file(s) remain in the converted list. See the log for details.",
+            )
+            for path, exc in failures:
+                self._log(f"Could not move {path} to system trash: {exc}", "error")
         
-        # Clear the preview panel
-        self._clear_preview_via_bus()
+        if not self._converted_data:
+            self._clear_preview_via_bus()
 
 
     def _move_and_clear_converted(self):
-        out_dir = self.app_state.v_output_dir.get().strip()
-        if not out_dir:
-            messagebox.showerror("Error", "Please select an output folder first.")
+        final_dir = self.app_state.v_final_destination_dir.get().strip()
+        if not final_dir:
+            messagebox.showerror(
+                tr("Error"), tr("Please select a final destination folder first.")
+            )
             return
-        
-        if not os.path.exists(out_dir):
-            messagebox.showerror("Error", f"Output folder does not exist:\n{out_dir}")
+
+        if not os.path.exists(final_dir):
+            messagebox.showerror(
+                tr("Error"),
+                tr("Final destination folder does not exist:\n{path}").format(path=final_dir),
+            )
             return
-            
+
         if not self._converted_data:
-            messagebox.showinfo("Move", "The converted list is empty.")
+            messagebox.showinfo(tr("Move"), tr("The converted list is empty."))
             return
-            
+
         import shutil
         moved = 0
-        errors = 0
+        already_in_destination = 0
+        processed = []
+        errors = []
         for iid, data in self._converted_data.items():
             src_path = data["path"]
-            if os.path.exists(src_path):
-                # Also move sidecar if it exists
-                sidecar_path = src_path + ".scores.json"
+            if not os.path.exists(src_path):
+                processed.append(iid)
+                continue
+            destination = os.path.join(final_dir, os.path.basename(src_path))
+            same_path = os.path.abspath(src_path) == os.path.abspath(destination)
+            if same_path:
+                already_in_destination += 1
+                processed.append(iid)
+                continue
+            if os.path.exists(destination):
+                errors.append(src_path)
+                self._log(
+                    f"Cannot move {src_path}: destination already exists at {destination}",
+                    "error",
+                )
+                continue
+
+            try:
+                shutil.move(src_path, destination)
+                moved += 1
+                processed.append(iid)
+            except Exception as exc:
+                errors.append(src_path)
+                self._log(f"Failed to move {src_path}: {exc}", "error")
+                continue
+
+            # The .scores.json sidecar is only useful while the file is still
+            # in the workshop folder for review. It must not be copied into
+            # the final destination (e.g. a Batocera share or USB stick).
+            sidecar_path = src_path + ".scores.json"
+            if os.path.exists(sidecar_path):
                 try:
-                    shutil.move(src_path, os.path.join(out_dir, os.path.basename(src_path)))
-                    if os.path.exists(sidecar_path):
-                        shutil.move(sidecar_path, os.path.join(out_dir, os.path.basename(sidecar_path)))
-                    moved += 1
-                except Exception as e:
-                    self._log(f"Failed to move {src_path}: {e}", "error")
-                    errors += 1
-                    
-        if errors > 0:
-            messagebox.showwarning("Move Completed", f"Moved {moved} files.\n{errors} errors occurred. See log.")
-        else:
-            self._log(f"🚚 Successfully moved {moved} files to {out_dir}")
-            
-        # Clear the list automatically
-        children = self._tree_converted.get_children()
-        if children:
-            self._tree_converted.delete(*children)
-        self._converted_data.clear()
-        self._converted_paths.clear()
+                    os.remove(sidecar_path)
+                except OSError as exc:
+                    self._log(f"Could not remove leftover score data for {src_path}: {exc}", "warning")
+
+        for iid in processed:
+            self._converted_data.pop(iid, None)
+        self._converted_paths = {
+            data["path"] for data in self._converted_data.values()
+        }
+        visible = set(self._tree_converted.get_children())
+        visible_processed = [iid for iid in processed if iid in visible]
+        if visible_processed:
+            self._tree_converted.delete(*visible_processed)
         self._update_converted_count()
         self._update_statistics()
-        self._selected_converted_iid = ""
+        if self._selected_converted_iid in processed:
+            self._selected_converted_iid = ""
+            self._clear_preview_via_bus()
+        self._log(
+            f"🚚 Moved {moved} file(s); {already_in_destination} were already in the destination."
+        )
+        if errors:
+            messagebox.showwarning(
+                tr("Move incomplete"),
+                tr("{count} file(s) could not be moved and remain in the list. See the log.").format(count=len(errors)),
+            )
 
     def _on_filter_changed(self, *_):
         # Basic filtering logic
@@ -529,37 +647,45 @@ class MiddlePanel(ctk.CTkFrame):
                 import send2trash
                 safe_delete = send2trash.send2trash
             except ImportError:
-                self._log("send2trash module missing. Deleting permanently instead.", "warning")
-                safe_delete = os.remove
+                messagebox.showerror(
+                    "Cannot move to trash",
+                    "The system-trash integration is unavailable. No files were deleted.",
+                )
+                return
                 
-            deleted = 0
+            removed = []
+            failures = []
             for iid, path in to_remove:
                 try:
                     if os.path.exists(path):
                         safe_delete(path)
                 except Exception as e:
-                    self._log(f"Failed to trash {path}: {e}", "warning")
+                    failures.append((path, e))
+                    self._log(f"Failed to move {path} to system trash: {e}", "error")
+                    continue
                     
-                # Also trash the sidecar if it exists
                 sidecar_path = path + ".scores.json"
                 if os.path.exists(sidecar_path):
                     try:
                         safe_delete(sidecar_path)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self._log(f"Failed to move score data to system trash: {e}", "warning")
                         
                 self._converted_paths.discard(path)
                 if iid in self._converted_data:
                     del self._converted_data[iid]
-                # remove from tree
                 if self._tree_converted.exists(iid):
                     self._tree_converted.delete(iid)
-                    
-                deleted += 1
+                removed.append(iid)
                     
             self._update_converted_count()
             self._update_statistics()
-            self._log(f"🧹 Trashed {deleted} files.")
+            self._log(f"🧹 Moved {len(removed)} files to the system trash.")
+            if failures:
+                messagebox.showwarning(
+                    "Some files could not be moved",
+                    f"{len(failures)} file(s) remain in the converted list.",
+                )
             
             # Clear preview if the selected item was trashed
             if self._selected_converted_iid in [iid for iid, _ in to_remove]:
@@ -581,5 +707,3 @@ class MiddlePanel(ctk.CTkFrame):
         lvl = {"debug": logging.DEBUG, "info": logging.INFO,
                "warning": logging.WARNING, "error": logging.ERROR}.get(level.lower(), logging.INFO)
         logger.log(lvl, message)
-
-

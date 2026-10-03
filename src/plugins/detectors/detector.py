@@ -95,6 +95,16 @@ def _fuse_rois(hits: list, roi_persistence_score: float = 1.0) -> Optional[Bound
     return BoundingBox(max(0, x), max(0, y), int(ww), int(wh))
 
 
+def _union_rois(rois: list) -> Optional[BoundingBox]:
+    if not rois:
+        return None
+    x1 = min(roi[0] for roi in rois)
+    y1 = min(roi[1] for roi in rois)
+    x2 = max(roi[0] + roi[2] for roi in rois)
+    y2 = max(roi[1] + roi[3] for roi in rois)
+    return BoundingBox(x1, y1, x2 - x1, y2 - y1)
+
+
 class AbstractDetector(IDetector):
     """
     Abstract base for concrete detectors.
@@ -112,11 +122,13 @@ class AbstractDetector(IDetector):
         roi_persistence_score: float = 1.0,
         platformer_mode: bool = False,
         expected_floor_y: Optional[float] = None,
+        group_subjects: bool = False,
         is_batch: bool = False,
     ) -> Optional[BoundingBox]:
         mode = (mode or "person").lower()
         if mode not in available_detectors():
             mode = "person"
+        group_subjects = bool(group_subjects and multi_fusion)
 
         if mode == "center":
             return None
@@ -124,20 +136,32 @@ class AbstractDetector(IDetector):
         if mode == "person":
             p = self.detect_person(frame, multi_fusion=multi_fusion, min_conf=min_conf,
                                    roi_persistence_score=roi_persistence_score,
-                                   platformer_mode=platformer_mode, expected_floor_y=expected_floor_y, is_batch=is_batch)
-            return p if p is not None else self.detect_motion(frame, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y)
+                                   platformer_mode=platformer_mode, expected_floor_y=expected_floor_y,
+                                   group_subjects=group_subjects, is_batch=is_batch)
+            return p if p is not None else self.detect_motion(
+                frame, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y,
+                group_subjects=group_subjects,
+            )
 
         if mode == "motion":
-            m = self.detect_motion(frame, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y)
+            m = self.detect_motion(
+                frame, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y,
+                group_subjects=group_subjects,
+            )
             return m if m is not None else self.detect_person(
                 frame, multi_fusion=multi_fusion, min_conf=min_conf,
-                roi_persistence_score=roi_persistence_score, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y, is_batch=is_batch)
+                roi_persistence_score=roi_persistence_score, platformer_mode=platformer_mode,
+                expected_floor_y=expected_floor_y, group_subjects=group_subjects, is_batch=is_batch)
 
         # hybrid: merge both
         p = self.detect_person(frame, multi_fusion=multi_fusion, min_conf=min_conf,
                                 roi_persistence_score=roi_persistence_score,
-                                platformer_mode=platformer_mode, expected_floor_y=expected_floor_y, is_batch=is_batch)
-        m = self.detect_motion(frame, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y)
+                                platformer_mode=platformer_mode, expected_floor_y=expected_floor_y,
+                                group_subjects=group_subjects, is_batch=is_batch)
+        m = self.detect_motion(
+            frame, platformer_mode=platformer_mode, expected_floor_y=expected_floor_y,
+            group_subjects=group_subjects,
+        )
         if p and m:
             x1 = min(p[0], m[0])
             y1 = min(p[1], m[1])
@@ -372,6 +396,7 @@ class _FrameDetector(AbstractDetector):
                       roi_persistence_score: float = 1.0,
                       platformer_mode: bool = False,
                       expected_floor_y: Optional[float] = None,
+                      group_subjects: bool = False,
                       is_batch: bool = False) -> Optional[BoundingBox]:
         if self._get_active_session(is_batch) is None:
             return None
@@ -379,6 +404,8 @@ class _FrameDetector(AbstractDetector):
             hits = self._detect_yolo_multi(frame, min_conf=min_conf,
                                             roi_persistence_score=roi_persistence_score,
                                             is_batch=is_batch)
+            if group_subjects:
+                return _union_rois([roi for _, roi in hits])
             return _fuse_rois(hits, roi_persistence_score=roi_persistence_score) if hits else None
         return self._detect_yolo(frame, min_conf=min_conf,
                                   roi_persistence_score=roi_persistence_score,
@@ -387,7 +414,8 @@ class _FrameDetector(AbstractDetector):
                                   is_batch=is_batch)
 
     def detect_motion(self, frame: np.ndarray, platformer_mode: bool = False,
-                      expected_floor_y: Optional[float] = None) -> Optional[BoundingBox]:
+                      expected_floor_y: Optional[float] = None,
+                      group_subjects: bool = False) -> Optional[BoundingBox]:
         cv2 = self.cv2
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -429,6 +457,14 @@ class _FrameDetector(AbstractDetector):
                     # Extreme floor tracking: massive penalty for ceiling to prevent boss/fx tracking
                     return area * (0.01 + 100.0 * (bottomness ** 4))
             return area
+
+        if group_subjects:
+            group = [
+                cv2.boundingRect(contour)
+                for contour in contours
+                if score_contour(contour) > 0.0
+            ]
+            return _union_rois(group)
 
         c_best = max(contours, key=score_contour)
         if score_contour(c_best) == 0.0:

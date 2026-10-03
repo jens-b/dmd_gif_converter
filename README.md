@@ -46,10 +46,11 @@ Tired of manually cropping and adjusting videos for your low-res LED matrix? Thi
 | **Smart Conversion Lists** | Files move from **Files To Convert** to **Converted Files** automatically upon completion. |
 | **DMD Quality Score** | Converted files receive a 0-100% Quality Score and |
 | **Preview Panel** | Shows the original video, the OpenCV Auto-Action crop bounding box (if enabled), and the final DMD representation. |
-| **Cleanup Assistant** | Instantly send bad conversions (e.g. <=30%, <=50%, or custom threshold) to the trash with one click. Files and metadata are permanently removed from the disk. |
+| **Cleanup Assistant** | Move low-scoring conversions (e.g. <=30%, <=50%, or a custom threshold) to the system trash after confirmation. |
 | **Sortable List** | Click on the `File`, `Score`, or `Category` column headers in the Converted List to sort items in ascending/descending order. |
-| **Smart Temp Folder** | If no output directory is defined, all files are stored in a `dmd_tmp/` subfolder inside your source folder to prevent mixing converted GIFs with your source videos. |
+| **Explicit output folder** | Choose the destination before each conversion run. The app displays the selected folder and does not silently create output folders beside source or cached files. |
 | **🔍 GIF Search** | Search & download GIFs from DuckDuckGo — keyword + quantity (up to 300), auto-populates the list |
+| **🎮 LaunchBox Clear Logos** | Load the LaunchBox platform catalog, select one or more platforms, and download transparent game-logo PNGs directly into the conversion list |
 | **🤖 AI Iconic Moments** | Auto-extracts the best moments from long videos based on 5 AI metrics and exports directly to the Converter |
 | **Triple live preview** | SOURCE (left) + AUTO ACTION intermediate (middle) + DMD OUTPUT (right) |
 | **Diagnostic Preview** | Clicking a converted file shows its score, rating, and bullet-point reasons explaining the score. |
@@ -66,8 +67,15 @@ Tired of manually cropping and adjusting videos for your low-res LED matrix? Thi
 | **Convert all listed files** | One click to process the whole current list |
 | **Real-time log** | Live progress feed in the UI |
 | **Cross-platform** | macOS · Windows · Linux |
+| **Interface language** | English by default; switch between English and German under Advanced Settings. Restart the app to apply the new language. |
 
 ---
+
+To add game artwork, click **LaunchBox Clear Logos** in the source panel, load the platform list, select one or more platforms, and download the logos. The downloaded PNGs are added to the normal conversion queue; the LaunchBox metadata archive, a searchable local index, and artwork are cached locally. Use **PNG-Darstellung** beside the output resolution to stretch, fit, or fill/crop static PNGs to the selected DMD size.
+
+To import media already scraped by Batocera, click **Batocera-Medien importieren** and enter the server/IP, SMB share (usually `share`), and Batocera network credentials. The dialog starts with the default Batocera credentials `root` / `linux`; change them if your system uses a different password. The app first lists the immediate folders under `roms`; select the systems and choose whether to import videos/GIFs, artwork, or both. Only the selected systems' `gamelist.xml` files are read. Supported `<video>` files and images referenced by `<image>`, `<thumbnail>`, `<marquee>`, or `<fanart>` are copied into a local cache; JPEG, WebP, and BMP artwork is normalized to PNG for conversion. The files are added to the normal conversion queue. The app imports already-scraped files; it does not start Batocera's scraper. Server, share, and username are stored in the app configuration; passwords are stored only in the operating system keychain when requested, otherwise they are used for that import only. The Batocera share itself is not modified.
+
+ScreenScraper member and API developer credentials can be entered in the app's **Settings** window under **ScreenScraper-Zugang**. Secrets are stored in the operating system keychain. Then click **ScreenScraper-Medien suchen** in the source panel, load and select a system, search for a game title, choose a matching game and supported media, and download it to the normal conversion queue. The API requires approved developer credentials; the member account and API developer credentials are separate. Requests are made one at a time and API quota errors are shown explicitly.
 
 ## 🚀 Quick start
 
@@ -193,8 +201,9 @@ MIT — free to use, modify and distribute.
 - **[CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)** — modern cross-platform UI framework
 - **[Pillow](https://python-pillow.org/)** — image handling for the UI preview and text overlay fallback
 - **[DuckDuckGo](https://duckduckgo.com/)** — image search API powering the GIF Search feature (no API key required)
+- **[LaunchBox Games Database](https://gamesdb.launchbox-app.com/)** — game metadata and Clear Logo artwork source
 - **[duckduckgo-search](https://github.com/deedy5/duckduckgo_search)** — Python wrapper for the DuckDuckGo search API
-- **[Requests](https://docs.python-requests.org/)** — HTTP library used for GIF downloads
+- **[Requests](https://docs.python-requests.org/)** — HTTP library used for GIF and LaunchBox downloads
 - **[Bitbank2](https://github.com/bitbank2/AnimatedGIF)** — AnimatedGIF library for ESP32
 - **[Mrfaptastic](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA)** — high-performance DMA HUB75 driver for ESP32
 - **[Retro Pixel LED Lite](https://github.com/fjgordillo86/RetroPixelLED-Lite)** — the project this tool was built for

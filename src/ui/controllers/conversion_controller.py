@@ -66,6 +66,15 @@ class ConversionController(IController):
 
         params = self._model.build_params() if hasattr(self._model, "build_params") else {}
         output_dir = self._model.get("v_output_dir", "")
+        if not output_dir or not os.path.isdir(output_dir):
+            message = "Choose an existing output folder before converting."
+            logger.error(message)
+            if self._view:
+                self._view.after(
+                    0,
+                    lambda: getattr(self._view, "_log")(message, "error"),
+                )
+            return
         trim_start = self._model.get("v_trim_start", 0.0)
         trim_end   = self._model.get("v_trim_end", 0.0)
         
@@ -96,7 +105,7 @@ class ConversionController(IController):
                 base_name += suffix
             out_name = base_name + ".gif"
             
-            out_path = os.path.join(output_dir, out_name) if output_dir else                        os.path.join(os.path.dirname(src_path), "dmd_out", out_name)
+            out_path = os.path.join(output_dir, out_name)
 
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
@@ -116,7 +125,9 @@ class ConversionController(IController):
             tmpdir = None
             auto_action_was_enabled = job_params.get("auto_action_enabled", False)
 
-            if auto_action_was_enabled:
+            if auto_action_was_enabled and Path(src_path).suffix.lower() == ".png":
+                _callback(f"[ACTION] {filename} — skipped for static PNG", "warning")
+            elif auto_action_was_enabled:
                 from src.engine.auto_action.main import preprocess_video_for_dmd
                 ok, p_src, msg = preprocess_video_for_dmd(src_path, callback=_callback, trim_start=start_s, trim_end=end_s)
                 if ok and p_src:

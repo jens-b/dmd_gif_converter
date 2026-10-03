@@ -1,15 +1,19 @@
 import customtkinter as ctk
+import tkinter as tk
+from tkinter import messagebox
 
 from src.ui.settings.conversion_settings import ConversionSettingsPanel
 from src.ui.settings.auto_action_settings import AutoActionSettingsPanel
 from src.ui.settings.display_settings import DisplaySettingsPanel
 from src.ui.settings.advanced_settings import AdvancedSettingsPanel
+from src.ui.settings.screenscraper_settings import ScreenScraperSettingsPanel
+from src.ui.i18n import get_language, localize_widget_tree, save_language, tr
 
 class SettingsWindow(ctk.CTkToplevel):
     def __init__(self, parent, app_state):
         super().__init__(parent)
-        self.title("⚙️ Advanced Settings")
-        self.geometry("420x750")
+        self.title(f"⚙️ {tr('Advanced Settings')}")
+        self.geometry("470x800")
         self.transient(parent.winfo_toplevel())
         
         self.grid_rowconfigure(0, weight=1)
@@ -17,6 +21,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         self.panel = SettingsPanel(self, app_state)
         self.panel.grid(row=0, column=0, sticky="nsew")
+        localize_widget_tree(self)
 
 class SettingsPanel(ctk.CTkFrame):
     def __init__(self, parent, app_state):
@@ -31,6 +36,25 @@ class SettingsPanel(ctk.CTkFrame):
         # Create a scrollable frame for all settings
         self.scroll_frame = ctk.CTkScrollableFrame(self)
         self.scroll_frame.grid(row=0, column=0, sticky="nsew")
+
+        language_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        language_frame.pack(fill="x", padx=13, pady=(8, 2))
+        ctk.CTkLabel(
+            language_frame,
+            text=tr("Interface language"),
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(side="left", padx=(0, 8))
+        self._language_var = tk.StringVar(
+            value=tr("English" if get_language() == "en" else "German")
+        )
+        self._language_menu = ctk.CTkOptionMenu(
+            language_frame,
+            variable=self._language_var,
+            values=[tr("English"), tr("German")],
+            command=self._on_language_changed,
+            width=130,
+        )
+        self._language_menu.pack(side="left")
 
         # Top toggles that were in _build_params_panel (Smart Color Boost)
         self._build_top_toggles(self.scroll_frame)
@@ -50,7 +74,10 @@ class SettingsPanel(ctk.CTkFrame):
         self.display_settings = DisplaySettingsPanel(self.scroll_frame, self.app_state)
         self.display_settings.pack(fill="x", padx=5, pady=5)
 
-        # 4. Advanced Settings
+        self.screenscraper_settings = ScreenScraperSettingsPanel(self.scroll_frame)
+        self.screenscraper_settings.pack(fill="x", padx=5, pady=5)
+
+        # Advanced Settings
         self.advanced_settings = AdvancedSettingsPanel(self.scroll_frame, self.app_state)
         self.advanced_settings.pack(fill="x", padx=5, pady=5)
 
@@ -63,6 +90,24 @@ class SettingsPanel(ctk.CTkFrame):
         
         # Initial call
         self._on_let_me_handle_toggle()
+
+    def _on_language_changed(self, selected: str):
+        language = "en" if selected in {"English", "Englisch"} else "de"
+        try:
+            save_language(language)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror(
+                tr("Error"),
+                tr("Could not save the language preference: {error}").format(error=exc),
+                parent=self.winfo_toplevel(),
+            )
+            self._language_var.set(tr("English" if get_language() == "en" else "German"))
+            return
+        messagebox.showinfo(
+            tr("Restart required"),
+            tr("The language will change after restarting the app."),
+            parent=self.winfo_toplevel(),
+        )
 
     def _build_top_toggles(self, parent):
         pg_frame = ctk.CTkFrame(parent, fg_color='#0f1a10', corner_radius=6)
@@ -221,7 +266,7 @@ class SettingsPanel(ctk.CTkFrame):
             self.app_state.v_action_auto_smoothness.set(True)
             self.app_state.v_action_auto_pillarbox_crop.set(True)
             self.app_state.v_action_dynamic_scene_detection.set(False)
-            self.app_state.v_action_zoom_max.set(1.0)
+            self.app_state.v_action_zoom_max.set(2.0)
         state = 'disabled' if enabled else 'normal'
         for widget in self.app_state.lmh_widgets:
             try:

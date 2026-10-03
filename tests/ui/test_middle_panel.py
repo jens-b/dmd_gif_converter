@@ -1,4 +1,7 @@
 import unittest
+import types
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 import customtkinter as ctk
 from src.ui.panels.middle_panel import MiddlePanel
@@ -65,11 +68,22 @@ class TestClearConverted(unittest.TestCase):
     def test_success(self, mock_msg, _):
         panel = _make_with_data()
         mock_msg.askyesno.return_value = True
-        with patch.dict("sys.modules", {"send2trash": None}):
+        trash = MagicMock()
+        with patch.dict("sys.modules", {"send2trash": types.SimpleNamespace(send2trash=trash)}):
             panel._clear_converted()
         panel._tree_converted.delete.assert_called_with("iid1", "iid2", "iid3")
         self.assertEqual(len(panel._converted_data), 0)
         self.assertEqual(panel._selected_converted_iid, "")
+
+    @patch("src.ui.panels.middle_panel.messagebox")
+    def test_missing_system_trash_does_not_delete_or_clear(self, mock_msg):
+        panel = _make_with_data()
+        mock_msg.askyesno.return_value = True
+        with patch.dict("sys.modules", {"send2trash": None}):
+            panel._clear_converted()
+        mock_msg.showerror.assert_called_once()
+        self.assertEqual(len(panel._converted_data), 3)
+        panel._tree_converted.delete.assert_not_called()
 
     @patch("src.ui.panels.middle_panel.messagebox")
     def test_empty_list_noop(self, mock_msg):
@@ -82,7 +96,8 @@ class TestClearConverted(unittest.TestCase):
         panel = _make_with_data()
         mock_msg.askyesno.return_value = True
         panel._tree_converted.get_children.return_value = ()
-        with patch.dict("sys.modules", {"send2trash": None}):
+        trash = MagicMock()
+        with patch.dict("sys.modules", {"send2trash": types.SimpleNamespace(send2trash=trash)}):
             panel._clear_converted()
         panel._tree_converted.delete.assert_not_called()
         self.assertEqual(len(panel._converted_data), 0)
@@ -107,20 +122,23 @@ class TestCleanupByScore(unittest.TestCase):
     def test_removes_below_threshold(self, mock_msg, _):
         panel = _make_with_data()
         mock_msg.askyesno.return_value = True
-        with patch.dict("sys.modules", {"send2trash": None}), patch("os.remove"):
+        trash = MagicMock()
+        with patch.dict("sys.modules", {"send2trash": types.SimpleNamespace(send2trash=trash)}):
             panel._cleanup_by_score(50)
         self.assertIn("iid1", panel._converted_data)
         self.assertNotIn("iid2", panel._converted_data)
         self.assertNotIn("iid3", panel._converted_data)
+        self.assertEqual(trash.call_count, 4)
 
     @patch("os.path.exists", return_value=False)
     @patch("src.ui.panels.middle_panel.messagebox")
     def test_file_missing_ui_still_cleared(self, mock_msg, _):
         panel = _make_with_data()
         mock_msg.askyesno.return_value = True
-        with patch.dict("sys.modules", {"send2trash": None}), patch("os.remove") as m:
+        trash = MagicMock()
+        with patch.dict("sys.modules", {"send2trash": types.SimpleNamespace(send2trash=trash)}):
             panel._cleanup_by_score(50)
-        m.assert_not_called()
+        trash.assert_not_called()
         self.assertNotIn("iid2", panel._converted_data)
 
     @patch("os.path.exists", return_value=True)
@@ -128,10 +146,10 @@ class TestCleanupByScore(unittest.TestCase):
     def test_exception_caught(self, mock_msg, _):
         panel = _make_with_data()
         mock_msg.askyesno.return_value = True
-        with patch.dict("sys.modules", {"send2trash": None}), \
-             patch("os.remove", side_effect=PermissionError("denied")):
+        trash = MagicMock(side_effect=PermissionError("denied"))
+        with patch.dict("sys.modules", {"send2trash": types.SimpleNamespace(send2trash=trash)}):
             panel._cleanup_by_score(50)
-        self.assertNotIn("iid2", panel._converted_data)
+        self.assertIn("iid2", panel._converted_data)
 
 
 class TestRemoveSelectedConverted(unittest.TestCase):
@@ -150,6 +168,49 @@ class TestRemoveSelectedConverted(unittest.TestCase):
         self.assertNotIn("iid1", panel._converted_data)
         self.assertNotIn("/a.gif", panel._converted_paths)
         self.assertEqual(panel._selected_converted_iid, "")
+
+
+class TestMoveAndClearConverted(unittest.TestCase):
+    @patch("src.ui.panels.middle_panel.messagebox")
+    def test_files_already_in_output_folder_are_not_moved_or_reported_as_errors(self, mock_msg):
+        with tempfile.TemporaryDirectory() as output_dir:
+            output_path = Path(output_dir) / "converted.gif"
+            output_path.write_bytes(b"gif")
+            panel = _make_panel()
+            panel.app_state.v_final_destination_dir.get.return_value = output_dir
+            panel._converted_data = {"iid1": {"path": str(output_path)}}
+            panel._converted_paths = {str(output_path)}
+            panel._tree_converted.get_children.return_value = ("iid1",)
+
+            panel._move_and_clear_converted()
+
+            self.assertTrue(output_path.exists())
+            self.assertEqual(panel._converted_data, {})
+            panel._tree_converted.delete.assert_called_once_with("iid1")
+            mock_msg.showwarning.assert_not_called()
+
+    @patch("src.ui.panels.middle_panel.messagebox")
+    def test_destination_collision_keeps_file_in_list(self, mock_msg):
+        with tempfile.TemporaryDirectory() as root:
+            source_dir = Path(root) / "source"
+            output_dir = Path(root) / "output"
+            source_dir.mkdir()
+            output_dir.mkdir()
+            source = source_dir / "converted.gif"
+            source.write_bytes(b"source")
+            (output_dir / source.name).write_bytes(b"existing")
+            panel = _make_panel()
+            panel.app_state.v_final_destination_dir.get.return_value = str(output_dir)
+            panel._converted_data = {"iid1": {"path": str(source)}}
+            panel._converted_paths = {str(source)}
+            panel._tree_converted.get_children.return_value = ("iid1",)
+
+            panel._move_and_clear_converted()
+
+            self.assertTrue(source.exists())
+            self.assertEqual(panel._converted_data, {"iid1": {"path": str(source)}})
+            panel._tree_converted.delete.assert_not_called()
+            mock_msg.showwarning.assert_called_once()
 
 
 class TestSortConverted(unittest.TestCase):

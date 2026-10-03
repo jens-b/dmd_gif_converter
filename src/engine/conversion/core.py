@@ -143,7 +143,7 @@ def _terminal_log(msg: str, level: str = "info") -> None:
 
 
 SUPPORTED_EXTENSIONS = {
-    ".gif", ".mp4", ".avi", ".mkv", ".mov", ".webm",
+    ".gif", ".png", ".mp4", ".avi", ".mkv", ".mov", ".webm",
     ".flv", ".wmv", ".m4v", ".mpg", ".mpeg", ".ts", ".3gp"
 }
 
@@ -186,6 +186,8 @@ DEFAULT_PARAMS = {
     # ── Advanced: Positioning ──────────────────────────────────────────────────
     # scroll_enabled=True  → default vertical auto-scroll behaviour (unchanged)
     "scroll_enabled": True,
+    # Static PNG inputs: "stretch" | "fit" | "fill"
+    "static_image_mode": "stretch",
     "zoom":           1.0,   # scale multiplier (1.0 = fit to 128 px width)
     "manual_x":       0,     # horizontal crop offset in pixels (manual mode)
     "manual_y":       0,     # vertical   crop offset in pixels (manual mode)
@@ -206,7 +208,7 @@ DEFAULT_PARAMS = {
     "action_auto_detector_fallback": False, # fallback to hybrid if person fails
     "action_strength":     0.65,       # 0..1 tighter framing around action
     "action_smoothness":   0.98,       # 0..0.98 camera smoothing
-    "action_zoom_max":     1.0,        # max dynamic zoom factor (1.0 = no zoom into action)
+    "action_zoom_max":     2.0,        # max dynamic zoom factor for portrait DMD output
     "action_padding":      0.20,       # ROI padding before aspect crop
     "action_subsample_frames": 3,      # Run YOLO every N frames
     "action_intro":        1.5,        # seconds of full-frame overview before zoom-in
@@ -289,10 +291,20 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
     # must analyse the original colours, not the auto-action crop).
     original_src = src_path
 
+    is_static_image = Path(src_path).suffix.lower() == ".png"
+    static_image_mode = str(p.get("static_image_mode", "stretch")).lower()
+    if is_static_image and static_image_mode not in {"stretch", "fit", "fill"}:
+        log(f"[ERROR] {filename} — unsupported PNG layout mode: {static_image_mode}", "error")
+        return False, f"[ERROR] {filename} — unsupported PNG layout mode"
     src_w, src_h, fps_src, duration_full = get_metadata(src_path)
     if not src_w:
         log(f"[ERROR] {filename} — could not read metadata", "error")
         return False, f"[ERROR] {filename} — metadata unreadable"
+    if is_static_image:
+        p["scroll_enabled"] = False
+        p["zoom"] = 1.0
+        p["manual_x"] = 0
+        p["manual_y"] = 0
 
     # Get target dimensions
     target_width = int(p.get("target_width", 128))
@@ -314,6 +326,9 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
         is_perfect_ratio = abs(src_ratio - target_ratio) < 0.05
 
     auto_action_enabled = bool(p.get("auto_action_enabled", False))
+    if is_static_image and auto_action_enabled:
+        auto_action_enabled = False
+        log(f"[ACTION ] {filename} — auto-action is not applicable to a static PNG", "warning")
 
     if keep_original_resolution:
         p["scroll_enabled"] = False
@@ -405,6 +420,11 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
     text_animation     = str(p.get("text_animation", "none"))
     text_bg            = bool(p.get("text_bg", False))
     text_bg_opacity    = int(p.get("text_bg_opacity", 60))
+    animated_static_image = (
+        is_static_image
+        and text_overlay_enabled
+        and text_animation in {"blink", "scroll_left", "scroll_up"}
+    )
 
     if text_overlay_enabled:
         log(f"[DEBUG ] {filename} — text_animation passed to core: '{text_animation}'", "debug")
@@ -438,7 +458,15 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
     target_w_scaled = max(target_width, round(target_width * zoom / 2) * 2)   # even, ≥ target_width
     scaled_h = math.ceil(((target_w_scaled / src_w) * src_h) / 2.0) * 2
 
-    if scroll_enabled:
+    if is_static_image:
+        duration_out = "1.0"
+        crop_x = "0"
+        crop_y = "0"
+        log(
+            f"[STATIC ] {filename} | src {src_w}x{src_h} → "
+            f"{target_width}x{target_height} (stretch, no scroll)"
+        )
+    elif scroll_enabled:
         # ── Auto-scroll (default behaviour, unchanged) ────────────────────────
         # Top crop: ignore the top fraction of the scaled image (e.g. title bars).
         # top_offset is always an even number (ffmpeg requires even crop coordinates).
@@ -563,6 +591,25 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
             f"[0:v]setpts=PTS-STARTPTS,fps={fps_render},scale={target_width}:{target_height}:flags=lanczos,format=rgb24,"
             f"{mid_filters}"
         )
+    elif is_static_image:
+        if static_image_mode == "fit":
+            image_layout_filters = (
+                f"scale={target_width}:{target_height}:"
+                "force_original_aspect_ratio=decrease:flags=lanczos,"
+                f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:color=black"
+            )
+        elif static_image_mode == "fill":
+            image_layout_filters = (
+                f"scale={target_width}:{target_height}:"
+                "force_original_aspect_ratio=increase:flags=lanczos,"
+                f"crop={target_width}:{target_height}"
+            )
+        else:
+            image_layout_filters = f"scale={target_width}:{target_height}:flags=lanczos"
+        filter_graph_base = (
+            f"[0:v]setpts=PTS-STARTPTS,fps={fps_render},"
+            f"{image_layout_filters},setsar=1,format=rgb24,{mid_filters}"
+        )
     else:
         # Original filter graph with scaling and cropping
         filter_graph_base = (
@@ -656,6 +703,8 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
     
     if auto_action_enabled:
         cmd += ["-i", src_path]
+    elif is_static_image:
+        cmd += ["-loop", "1", "-framerate", str(fps_render), "-t", duration_out, "-i", src_path]
     else:
         cmd += ["-stream_loop", "-1", "-t", duration_out, "-i", src_path]
         
@@ -671,6 +720,8 @@ def process_file(src_path, out_path, params=None, start_s=None, end_s=None, call
             cmd += ["-c:v", best_encoder, "-b:v", "5M"]
     else:
         cmd += ["-gifflags", "-offsetting-transdiff", "-f", "gif"]
+        if is_static_image and not animated_static_image:
+            cmd += ["-frames:v", "1", "-loop", "0", "-final_delay", "100"]
         
     cmd += [out_path]
 
@@ -752,6 +803,7 @@ def process_folder(folder_in, folder_out, params=None, callback=None, progress_c
         f for f in os.listdir(str(folder_in))
         if Path(f).suffix.lower() in SUPPORTED_EXTENSIONS
     ]
+    files.sort(key=str.casefold)
     if not files:
         logger.warning(f"No supported files found in {folder_in}")
         return []
@@ -812,6 +864,9 @@ def process_folder(folder_in, folder_out, params=None, callback=None, progress_c
         src = os.path.join(str(folder_in), filename)
         cfg = action_cfg.copy()
         if cancel_event and cancel_event.is_set():
+            return filename, src, None
+        if Path(src).suffix.lower() == ".png":
+            log(f"[ACTION ] {filename} — skipped for static PNG", "warning")
             return filename, src, None
 
         ok, pre_src, msg = preprocess_video_for_dmd(src, cfg, cancel_event=cancel_event, callback=log)

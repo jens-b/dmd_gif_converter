@@ -38,6 +38,7 @@ from src.ui.dmd_led_sim import (
     apply_led_grid as _apply_led_grid,
 )
 from src.ui.events.event_bus import EventBus, EventType
+from src.ui.i18n import tr
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,8 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         # ── current file ──────────────────────────────────────────────────────
         self._current_path = None
         self._source_duration = 10.0
+        self._source_width = 0
+        self._source_height = 0
 
         # ── source preview state ──────────────────────────────────────────────
         self._src_pil_frames = []
@@ -198,7 +201,14 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
                                      bg=BG_CANVAS, highlightthickness=0)
         self._src_canvas.pack(padx=2, pady=(2, 2), expand=True, fill="both")
         self._src_canvas.bind("<Configure>", lambda e: self._on_canvas_resize(e, "src"))
-        self._src_info = _InfoBadge(self._src_wrap, width=SRC_CANVAS_W)
+        self._src_info = ctk.CTkLabel(
+            self._src_wrap,
+            text="",
+            width=SRC_CANVAS_W,
+            font=ctk.CTkFont(size=10),
+            text_color="#778899",
+            wraplength=SRC_CANVAS_W,
+        )
         self._src_info.pack(pady=(0, 4))
 
         self._auto_wrap = ctk.CTkFrame(dc, fg_color=BG_CANVAS, corner_radius=6)
@@ -230,6 +240,14 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._dmd_info = _InfoBadge(
             dmd_wrap, width=int(DEFAULT_PARAMS["target_width"] * DMD_DISPLAY_SCALE_FACTOR))
         self._dmd_info.pack(pady=(0, 4))
+        ctk.CTkLabel(
+            dmd_wrap,
+            text=tr("Preview is limited to 10 seconds; conversion exports the selected or full duration."),
+            text_color="#778899",
+            font=ctk.CTkFont(size=10),
+            wraplength=520,
+            justify="center",
+        ).pack(padx=8, pady=(0, 5))
 
         self._canvas = self._src_canvas
         self._preview_info = self._src_info
@@ -393,7 +411,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
                                      text="⏳  Loading preview…",
                                      fill="#7ec8e3", font=("Helvetica", 12), justify="center",
                                      width=cw - 20, tags="info_text")
-        _, __, ___, dur = get_metadata(file_path)
+        self._source_width, self._source_height, _, dur = get_metadata(file_path)
         self._source_duration = dur if dur and dur > 0 else 10.0
         self.panel._update_trim_sliders()
 
@@ -439,6 +457,26 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             self._src_tmpdir = None
 
     def _extract_source_frames(self, file_path, gen_id):
+        if Path(file_path).suffix.lower() == ".png":
+            try:
+                with Image.open(file_path) as image:
+                    frame = image.convert("RGBA").copy()
+                self.after(
+                    0,
+                    lambda: self._on_source_frames_ready(
+                        [frame], [1000], None, file_path, gen_id
+                    ),
+                )
+            except (OSError, tk.TclError) as exc:
+                logger.warning("Could not load PNG preview for %s: %s", file_path, exc)
+                self.after(
+                    0,
+                    lambda: self._on_source_frames_ready(
+                        [], [], None, file_path, gen_id
+                    ),
+                )
+            return
+
         tmpdir = tempfile.mkdtemp(prefix="dmd_src_")
         fps_prev = 12.5
         dur = min(self._source_duration, 10.0)
@@ -463,7 +501,8 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
 
     def _on_source_frames_ready(self, pil_frames, delays, tmpdir, file_path, gen_id=0):
         if getattr(self, "_src_gen_id", 0) != gen_id:
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            if tmpdir:
+                shutil.rmtree(tmpdir, ignore_errors=True)
             self._src_rendering = False
             self._flush_src_pending()
             return
@@ -475,23 +514,31 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
                                          text="⚠️  Preview unavailable\n(ffmpeg missing?)",
                                          fill="#e74c3c", font=("Helvetica", 11), justify="center",
                                          width=cw - 20, tags="info_text")
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            if tmpdir:
+                shutil.rmtree(tmpdir, ignore_errors=True)
             return
         self._src_tmpdir = tmpdir
         self._src_pil_frames = pil_frames
         self._src_frames = [None] * len(pil_frames)
         self._src_delays = delays
         self._src_idx = 0
-        self._src_info.configure(
-            text=f"{Path(file_path).name}   ·   {len(pil_frames)} frames   ·   {self._source_duration:.1f} s")
+        dimensions = (
+            f"{self._source_width} × {self._source_height} px"
+            if self._source_width and self._source_height else "Größe unbekannt"
+        )
+        media_details = (
+            f"{dimensions} · Standbild" if Path(file_path).suffix.lower() == ".png"
+            else f"{dimensions} · {len(pil_frames)} Frames · {self._source_duration:.1f} s"
+        )
+        self._src_info.configure(text=f"{Path(file_path).name}\n{media_details}")
         self._animate_src()
 
     def _animate_src(self):
         if not self._src_pil_frames:
             return
         num = len(self._src_pil_frames)
-        idx = self._src_idx % (num + 1)
-        if idx == num:
+        idx = self._src_idx % (num + 1) if num > 1 else 0
+        if num > 1 and idx == num:
             self._src_canvas.delete("all")
             self._src_canvas.create_rectangle(0, 0, 9999, 9999, fill="black", outline="")
             self._src_idx += 1
@@ -516,6 +563,10 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
             
         self._src_canvas.delete("all")
         self._src_canvas.create_image(cw // 2, ch // 2, anchor="center", image=self._src_frames[idx])
+        if num == 1:
+            self._src_idx = 0
+            self._src_job = None
+            return
         self._src_idx += 1
         self._src_job = self.after(self._src_delays[idx] if self._src_delays else 80, self._animate_src)
 
@@ -538,6 +589,7 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._auto_frames.clear()
         self._auto_delays.clear()
         self._auto_idx = 0
+        self._auto_static_photo = None
         if self._auto_tmpdir and os.path.isdir(self._auto_tmpdir):
             shutil.rmtree(self._auto_tmpdir, ignore_errors=True)
             self._auto_tmpdir = None
@@ -552,6 +604,14 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         self._auto_gen_id = getattr(self, "_auto_gen_id", 0) + 1
         if self._auto_rendering:
             self._auto_pending_src = src
+            return
+        if Path(src).suffix.lower() == ".png":
+            self._auto_pending_src = None
+            self._auto_rendering = False
+            self._stop_auto_preview()
+            self._show_static_auto_preview(src)
+            self._auto_info.configure(text="Standbild · Auto-Action nicht erforderlich")
+            self._start_dmd_generation(src)
             return
         if not self.app_state.v_action_enabled.get():
             self._stop_auto_preview()
@@ -595,7 +655,8 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         except Exception:
             pass
 
-        if is_original_mode or (bypass_active and is_perfect_ratio):
+        is_static_png = Path(src).suffix.lower() == ".png"
+        if is_static_png or is_original_mode or (bypass_active and is_perfect_ratio):
             self._on_auto_bypass()
             return
 
@@ -726,6 +787,27 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
         # Chain to DMD generation
         if self._current_path:
             self._start_dmd_generation(self._current_path)
+
+    def _show_static_auto_preview(self, src):
+        try:
+            with Image.open(src) as image:
+                preview = image.convert("RGBA")
+            cw = max(20, self._auto_canvas.winfo_width()) if self._auto_canvas.winfo_width() > 10 else AUTO_CANVAS_W
+            ch = max(20, self._auto_canvas.winfo_height()) if self._auto_canvas.winfo_height() > 10 else AUTO_CANVAS_H
+            preview.thumbnail((cw, ch), Image.Resampling.LANCZOS)
+            self._auto_static_photo = ImageTk.PhotoImage(preview)
+            self._auto_canvas.delete("all")
+            self._auto_canvas.create_image(
+                cw // 2, ch // 2, anchor="center", image=self._auto_static_photo
+            )
+        except (OSError, tk.TclError) as exc:
+            logger.warning("Could not show static-image auto preview for %s: %s", src, exc)
+            self._auto_canvas.delete("all")
+            self._auto_canvas.create_text(
+                AUTO_CANVAS_W // 2, AUTO_CANVAS_H // 2,
+                text="Standbild-Vorschau nicht verfügbar",
+                fill="#e74c3c", font=("Helvetica", 11), justify="center",
+            )
 
     def _flush_auto_pending(self):
         pending, self._auto_pending_src = self._auto_pending_src, None
@@ -1051,4 +1133,3 @@ class PreviewPlayer(ctk.CTkScrollableFrame):
     # ══════════════════════════════════════════════════════════════════════════
     #  PARAMS COLLECTION
     # ══════════════════════════════════════════════════════════════════════════
-

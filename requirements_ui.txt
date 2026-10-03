@@ -13,3 +13,6 @@ onnxruntime>=1.16.0
 ddgs>=7.0.0
 requests>=2.31.0
 send2trash>=1.8.0
+# Direct Batocera SMB access and secure password storage
+smbprotocol>=1.15.0
+keyring>=25.0.0

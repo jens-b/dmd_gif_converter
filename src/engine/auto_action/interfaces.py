@@ -34,6 +34,7 @@ class IDetector(ABC):
         roi_persistence_score: float = 1.0,
         platformer_mode: bool = False,
         expected_floor_y: Optional[float] = None,
+        group_subjects: bool = False,
     ) -> Optional[BoundingBox]:
         """Process a BGR frame and return the best bounding box or None."""
         pass
@@ -47,12 +48,19 @@ class IDetector(ABC):
         roi_persistence_score: float = 1.0,
         platformer_mode: bool = False,
         expected_floor_y: Optional[float] = None,
+        group_subjects: bool = False,
     ) -> Optional[BoundingBox]:
         """Detect the primary person in the frame."""
         pass
 
     @abstractmethod
-    def detect_motion(self, frame: np.ndarray, platformer_mode: bool = False, expected_floor_y: Optional[float] = None) -> Optional[BoundingBox]:
+    def detect_motion(
+        self,
+        frame: np.ndarray,
+        platformer_mode: bool = False,
+        expected_floor_y: Optional[float] = None,
+        group_subjects: bool = False,
+    ) -> Optional[BoundingBox]:
         """Detect the primary motion region in the frame."""
         pass
 

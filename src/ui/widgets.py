@@ -1,5 +1,6 @@
 import tkinter as tk
 import customtkinter as ctk
+from src.ui.i18n import tr
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  _InfoBadge — compact ℹ icon with hover tooltip
@@ -37,7 +38,7 @@ class _InfoBadge:
 
     def configure(self, text: str = "", **_kw):
         """Update tooltip content.  Shows ℹ when text is non-empty."""
-        self._text = text or ""
+        self._text = tr(text) if text else ""
         self._lbl.configure(text="ℹ" if self._text else "")
         # Refresh live tooltip if already open
         if self._tip_win and self._text:
@@ -137,7 +138,7 @@ class ToolTip:
     """
     def __init__(self, widget, text, delay=500):
         self.widget = widget
-        self.text = text
+        self.text = tr(text)
         self.delay = delay
         self.tooltip_window = None
         self.id = None
@@ -180,4 +181,3 @@ class ToolTip:
         if self.tooltip_window:
             self.tooltip_window.destroy()
             self.tooltip_window = None
-

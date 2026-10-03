@@ -45,9 +45,7 @@ class _StubOutPath:
         if out_dir and os.path.isdir(out_dir):
             return str(Path(out_dir) / base)
 
-        tmp_dir = Path(src).parent / "dmd_tmp"
-        tmp_dir.mkdir(parents=True, exist_ok=True)
-        return str(tmp_dir / base)
+        raise ValueError("Choose an existing output folder before converting.")
 
 
 # ---------------------------------------------------------------------------
@@ -57,39 +55,60 @@ class _StubOutPath:
 class TestOutPathAlwaysGif(unittest.TestCase):
 
     def test_mp4_input_produces_gif_output(self):
-        stub = _StubOutPath()
-        result = stub._out_path("/tmp/myvideo.mp4")
-        self.assertTrue(result.endswith(".gif"),
-                        f"Attendu .gif, obtenu : {result}")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(output_dir=tmpdir)
+            result = stub._out_path("/tmp/myvideo.mp4")
+            self.assertTrue(result.endswith(".gif"),
+                            f"Attendu .gif, obtenu : {result}")
 
     def test_avi_input_produces_gif_output(self):
-        stub = _StubOutPath()
-        result = stub._out_path("/tmp/myvideo.avi")
-        self.assertTrue(result.endswith(".gif"),
-                        f"Attendu .gif, obtenu : {result}")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(output_dir=tmpdir)
+            result = stub._out_path("/tmp/myvideo.avi")
+            self.assertTrue(result.endswith(".gif"),
+                            f"Attendu .gif, obtenu : {result}")
 
     def test_mkv_input_produces_gif_output(self):
-        stub = _StubOutPath()
-        result = stub._out_path("/tmp/clip.mkv")
-        self.assertTrue(result.endswith(".gif"),
-                        f"Attendu .gif, obtenu : {result}")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(output_dir=tmpdir)
+            result = stub._out_path("/tmp/clip.mkv")
+            self.assertTrue(result.endswith(".gif"),
+                            f"Attendu .gif, obtenu : {result}")
 
     def test_mov_input_produces_gif_output(self):
-        stub = _StubOutPath()
-        result = stub._out_path("/tmp/clip.mov")
-        self.assertTrue(result.endswith(".gif"),
-                        f"Attendu .gif, obtenu : {result}")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(output_dir=tmpdir)
+            result = stub._out_path("/tmp/clip.mov")
+            self.assertTrue(result.endswith(".gif"),
+                            f"Attendu .gif, obtenu : {result}")
 
     def test_gif_input_also_produces_gif_output(self):
-        stub = _StubOutPath()
-        result = stub._out_path("/tmp/anim.gif")
-        self.assertTrue(result.endswith(".gif"),
-                        f"Attendu .gif, obtenu : {result}")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(output_dir=tmpdir)
+            result = stub._out_path("/tmp/anim.gif")
+            self.assertTrue(result.endswith(".gif"),
+                            f"Attendu .gif, obtenu : {result}")
 
     def test_output_stem_includes_dmd_suffix(self):
-        stub = _StubOutPath()
-        result = stub._out_path("/tmp/myvideo.mp4")
-        self.assertIn("myvideo_dmd", Path(result).name)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(output_dir=tmpdir)
+            result = stub._out_path("/tmp/myvideo.mp4")
+            self.assertIn("myvideo_dmd", Path(result).name)
+
+    def test_missing_output_dir_is_rejected_without_creating_a_source_subfolder(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath()
+            source = Path(tmpdir) / "source.mp4"
+            with self.assertRaisesRegex(ValueError, "Choose an existing output folder"):
+                stub._out_path(str(source))
+            self.assertFalse((source.parent / "dmd_tmp").exists())
 
     def test_custom_out_dir_is_respected(self):
         import tempfile
@@ -101,11 +120,14 @@ class TestOutPathAlwaysGif(unittest.TestCase):
 
     def test_custom_out_name_from_per_gif_config(self):
         """Un custom_out_name configuré par l'utilisateur doit être respecté."""
-        stub = _StubOutPath(
-            per_gif_configs={"item1": {"custom_out_name": "custom_output.gif"}}
-        )
-        result = stub._out_path("/tmp/myvideo.mp4", iid="item1")
-        self.assertTrue(Path(result).name == "custom_output.gif")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub = _StubOutPath(
+                output_dir=tmpdir,
+                per_gif_configs={"item1": {"custom_out_name": "custom_output.gif"}}
+            )
+            result = stub._out_path("/tmp/myvideo.mp4", iid="item1")
+            self.assertTrue(Path(result).name == "custom_output.gif")
 
 
 class TestFfmpegConverterGifFormat(unittest.TestCase):
@@ -170,4 +192,3 @@ class TestOutPathSourceCodeConsistency(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

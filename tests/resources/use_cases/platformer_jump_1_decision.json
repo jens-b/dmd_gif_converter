@@ -1,5 +1,5 @@
 {
-  "task_id": "BB5E5",
+  "task_id": "4CB25",
   "file_info": {
     "filename": "platformer_jump_1.gif",
     "video_width": 640,
@@ -17,13 +17,13 @@
     }
   },
   "raw_signals": {
-    "tall_ratio": 0.89375,
-    "fill_ratio": 0.25354609929078015,
-    "body_aspect": 1.1171875,
+    "tall_ratio": 0.9,
+    "fill_ratio": 0.2553191489361702,
+    "body_aspect": 1.1428571428571428,
     "floor_in_lower": true,
-    "floor_var_score": 0.1822832093503088,
-    "x_variance": 0.04662217919516101,
-    "y_variance": 0.02518319353337956
+    "floor_var_score": 0.1961274885490879,
+    "x_variance": 0.046209716796875,
+    "y_variance": 0.021544685860091922
   },
   "decisions": {
     "face_priority": {

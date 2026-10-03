@@ -21,6 +21,7 @@ class ConversionConfig:
     trim_start: float = 0.0
     trim_end: float = 0.0
     scroll_enabled: bool = True
+    static_image_mode: str = "stretch"
     zoom: float = 1.0
     manual_x: int = 0
     manual_y: int = 0

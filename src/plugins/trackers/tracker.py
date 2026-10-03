@@ -116,23 +116,35 @@ class DetectionStage(ITrackerStage):
             return
 
         if engine.face_priority_mode:
+            group_subjects = getattr(engine.cfg, "subject_framing", "group") == "group"
             context.raw_roi = engine.detector.detect(
                 context.frame, engine.current_detector,
-                multi_fusion=engine.cfg.multi_roi_fusion_enabled and not engine.cfg.platformer_mode,
+                multi_fusion=(
+                    engine.cfg.multi_roi_fusion_enabled
+                    and not engine.cfg.platformer_mode
+                    and group_subjects
+                ),
                 min_conf=engine.cfg.roi_confidence_min,
                 roi_persistence_score=engine.roi_persistence_score if getattr(engine.cfg, 'dynamic_roi_confidence_enabled', True) else 1.0,
                 platformer_mode=engine.cfg.platformer_mode,
-                expected_floor_y=expected_floor_y
+                expected_floor_y=expected_floor_y,
+                group_subjects=group_subjects,
             )
         else:
+            group_subjects = getattr(engine.cfg, "subject_framing", "group") == "group"
             detect_frame = context.frame[engine.effective_frame_top:engine.effective_frame_h, :]
             context.raw_roi = engine.detector.detect(
                 detect_frame, engine.current_detector,
-                multi_fusion=engine.cfg.multi_roi_fusion_enabled and not engine.cfg.platformer_mode,
+                multi_fusion=(
+                    engine.cfg.multi_roi_fusion_enabled
+                    and not engine.cfg.platformer_mode
+                    and group_subjects
+                ),
                 min_conf=engine.cfg.roi_confidence_min,
                 roi_persistence_score=engine.roi_persistence_score if getattr(engine.cfg, 'dynamic_roi_confidence_enabled', True) else 1.0,
                 platformer_mode=engine.cfg.platformer_mode,
-                expected_floor_y=expected_floor_y - engine.effective_frame_top if expected_floor_y is not None else None
+                expected_floor_y=expected_floor_y - engine.effective_frame_top if expected_floor_y is not None else None,
+                group_subjects=group_subjects,
             )
             if context.raw_roi is not None and engine.effective_frame_top > 0:
                 rx, ry, rw, rh = context.raw_roi
@@ -177,7 +189,10 @@ class ValidationStage(ITrackerStage):
 class FaceClippingStage(ITrackerStage):
     """Clips ROI to face or eyes depending on profile."""
     def process(self, context: FrameTrackingContext, engine: 'TrackingEngine') -> None:
-        context.face_roi = engine._clip_to_face_roi(context.raw_roi)
+        if getattr(engine.cfg, "subject_framing", "group") == "group":
+            context.face_roi = context.raw_roi
+        else:
+            context.face_roi = engine._clip_to_face_roi(context.raw_roi)
 
 
 class FloorEstimationStage(ITrackerStage):

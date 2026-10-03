@@ -27,9 +27,11 @@ from src.ui.panels.ai_moments_panel import AiMomentsPanel
 from src.ui.panels.log_console import LogConsole
 
 from src.ui.constants import APP_VERSION
+from src.ui.i18n import get_language, load_language, localize_widget_tree, set_language
 
 class DMDConverterApp(ctk.CTk):
     def __init__(self):
+        set_language(load_language())
         super().__init__()
         self.title(f"🎞️  DMD GIF Converter  v{APP_VERSION}")
         self.geometry("1300x920")
@@ -74,8 +76,12 @@ class DMDConverterApp(ctk.CTk):
         self.tabview = ctk.CTkTabview(self)
         self.tabview.grid(row=0, column=0, sticky="nsew", padx=10, pady=(0, 5))
 
-        self.tab_conversion = self.tabview.add("Conversion")
-        self.tab_ai_moments = self.tabview.add("Moments")
+        self.tab_conversion = self.tabview.add(
+            "Konvertierung" if get_language() == "de" else "Conversion"
+        )
+        self.tab_ai_moments = self.tabview.add(
+            "Momente" if get_language() == "de" else "Moments"
+        )
 
         # ── Moments Tab ───────────────────────────────────────────────────────
         self.tab_ai_moments.grid_columnconfigure(0, weight=1)
@@ -85,9 +91,11 @@ class DMDConverterApp(ctk.CTk):
 
 
         # ── Conversion Tab ────────────────────────────────────────────────────
+        # Column order follows the numbered workflow left → right:
+        # 1️⃣ source files · 2️⃣ workshop folder & convert · 3️⃣/4️⃣ review & move.
         self.tab_conversion.grid_columnconfigure(0, weight=1)
-        self.tab_conversion.grid_columnconfigure(1, weight=1)
-        self.tab_conversion.grid_columnconfigure(2, weight=2)
+        self.tab_conversion.grid_columnconfigure(1, weight=2)
+        self.tab_conversion.grid_columnconfigure(2, weight=1)
         self.tab_conversion.grid_rowconfigure(0, weight=1)
 
         self.left_panel = LeftPanel(self.tab_conversion, self.app_state)
@@ -109,17 +117,19 @@ class DMDConverterApp(ctk.CTk):
                 var.trace_add("write", lambda *_: self.preview_controller.schedule_refresh())
 
         self.left_panel.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        self.middle_panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        self.preview_panel.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
+        self.preview_panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        self.middle_panel.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
         # Wire panels together: PreviewPanel owns conversion logic
         self.preview_panel.set_sibling_panels(self.left_panel, self.middle_panel)
 
-        # Enable "Convert selected" button when a file is selected in LeftPanel
+        # Enable "Convert selected" button and reflect the current selection
+        # count (so multi-selecting files is visibly tied to converting all of them).
         def _on_selection_changed(payload):
-            if self.left_panel._selected_iid:
-                if not getattr(self.preview_panel, "_busy", False):
-                    self.preview_panel.controls._btn_conv_sel.configure(state="normal")
+            count = (payload or {}).get("count", 0)
+            self.preview_panel.controls.update_convert_selected_button(count)
+            if count and not getattr(self.preview_panel, "_busy", False):
+                self.preview_panel.controls._btn_conv_sel.configure(state="normal")
             else:
                 self.preview_panel.controls._btn_conv_sel.configure(state="disabled")
         
@@ -127,11 +137,12 @@ class DMDConverterApp(ctk.CTk):
             self.preview_controller._cancel_pending()
             
         EventBus.subscribe(EventType.PREVIEW_SOURCE_CHANGED, _cancel_debounce)
-        EventBus.subscribe(EventType.PREVIEW_SOURCE_CHANGED, _on_selection_changed)
+        EventBus.subscribe(EventType.SELECTION_CHANGED, _on_selection_changed)
 
         # ── Log panel (bottom, retractable) ──────────────────────────────────
         self.log_console = LogConsole(self)
         self.log_console.grid(row=1, column=0, sticky="ew", padx=0, pady=0)
+        localize_widget_tree(self)
 
     def _on_log_event(self, payload):
         self._log_queue.put(payload)

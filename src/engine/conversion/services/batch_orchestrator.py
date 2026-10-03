@@ -21,7 +21,7 @@ class BatchOrchestrator(IBatchOrchestrator):
     """Orchestrates parallel batch processing of video/GIF files."""
 
     SUPPORTED_EXTENSIONS = {
-        ".gif", ".mp4", ".avi", ".mkv", ".mov", ".webm",
+        ".gif", ".png", ".mp4", ".avi", ".mkv", ".mov", ".webm",
         ".flv", ".wmv", ".m4v", ".mpg", ".mpeg", ".ts", ".3gp"
     }
 
@@ -90,6 +90,9 @@ class BatchOrchestrator(IBatchOrchestrator):
 
         def _run_preprocess(filename):
             src = os.path.join(str(input_folder), filename)
+            if Path(src).suffix.lower() == ".png":
+                log(f"[ACTION] {filename} — skipped for static PNG", "warning")
+                return filename, src, None
             ok, pre_src, msg = self._preprocess(src)
             if ok and pre_src:
                 log(f"[ACTION] {filename} — {msg}")

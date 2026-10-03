@@ -180,7 +180,7 @@ class TestBuildCameraRectClamping(unittest.TestCase):
 
 
 class TestBuildCameraRectZoomMax(unittest.TestCase):
-    """Zoom is strictly performed for aspect ratio fitting, never to zoom in on action."""
+    """Dynamic zoom is limited to portrait output or explicitly enabled."""
 
     def test_zoom_max_1_no_zoom(self):
         cfg = _default_cfg(zoom_max=1.0, strength=1.0)
@@ -197,10 +197,41 @@ class TestBuildCameraRectZoomMax(unittest.TestCase):
         self.assertAlmostEqual(cw_nz, FRAME_W, delta=2.0)
         self.assertAlmostEqual(cw_z, FRAME_W, delta=2.0)
 
+    def test_portrait_output_zooms_to_fit_detected_group(self):
+        cfg = _default_cfg(target_width=32, target_height=64, zoom_max=2.0, padding=0.2)
+        full_view = _build_camera_rect(FRAME_W, FRAME_H, None, cfg)
+        focused = _build_camera_rect(FRAME_W, FRAME_H, (280, 180, 40, 80), cfg)
+
+        self.assertEqual(full_view[2:], (240.0, 480.0))
+        self.assertLess(focused[2], full_view[2])
+        self.assertAlmostEqual(focused[2] / focused[3], 0.5)
+        self.assertGreaterEqual(focused[2], full_view[2] / 2.0)
+
+    def test_dynamic_zoom_can_be_enabled_for_other_output_sizes(self):
+        cfg = _default_cfg(
+            target_width=128,
+            target_height=32,
+            dynamic_zoom_all_sizes=True,
+            zoom_max=2.0,
+            padding=0.2,
+        )
+        full_view = _build_camera_rect(FRAME_W, FRAME_H, None, cfg)
+        focused = _build_camera_rect(FRAME_W, FRAME_H, (280, 180, 40, 80), cfg)
+
+        self.assertLess(focused[2], full_view[2])
+        self.assertAlmostEqual(focused[2] / focused[3], 4.0)
+
+    def test_non_portrait_output_keeps_wide_view_by_default(self):
+        cfg = _default_cfg(target_width=128, target_height=32, zoom_max=2.0)
+        full_view = _build_camera_rect(FRAME_W, FRAME_H, None, cfg)
+        focused = _build_camera_rect(FRAME_W, FRAME_H, (280, 180, 40, 80), cfg)
+
+        self.assertEqual(focused[2:], full_view[2:])
+
 
 
 class TestSmooth(unittest.TestCase):
-    """_smooth() blends cx, cy while keeping cw, ch locked to curr."""
+    """_smooth() blends both camera translation and zoom dimensions."""
 
     def test_zero_smoothness_returns_curr(self):
         result = _smooth((10, 20, 30, 40), (1, 2, 3, 4), 0.0)
@@ -210,15 +241,15 @@ class TestSmooth(unittest.TestCase):
         result = _smooth((10, 20, 30, 40), (1, 2, 3, 4), 0.98)
         self.assertAlmostEqual(result[0], 10, delta=1.0)
         self.assertAlmostEqual(result[1], 20, delta=1.0)
-        self.assertEqual(result[2], 3)
-        self.assertEqual(result[3], 4)
+        self.assertAlmostEqual(result[2], 29.46)
+        self.assertAlmostEqual(result[3], 39.28)
 
     def test_half_smoothness_midpoint(self):
         result = _smooth((0.0, 0.0, 0.0, 0.0), (10.0, 10.0, 10.0, 10.0), 0.5)
         self.assertAlmostEqual(result[0], 5.0, places=5)
         self.assertAlmostEqual(result[1], 5.0, places=5)
-        self.assertEqual(result[2], 10.0)
-        self.assertEqual(result[3], 10.0)
+        self.assertEqual(result[2], 5.0)
+        self.assertEqual(result[3], 5.0)
 
     def test_none_prev_returns_curr(self):
         result = _smooth(None, (1, 2, 3, 4), 0.8)
@@ -257,4 +288,3 @@ class TestApplyLookAhead(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

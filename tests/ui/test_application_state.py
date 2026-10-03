@@ -35,6 +35,8 @@ class TestApplicationState(unittest.TestCase):
 
         self.assertTrue(hasattr(self.app_state, "v_mode"))
         self.assertIsInstance(self.app_state.v_mode, MockVar)
+        self.assertTrue(hasattr(self.app_state, "v_static_image_mode"))
+        self.assertEqual(self.app_state.v_static_image_mode.get(), "stretch")
 
     def test_get_set(self):
         """Test getting and setting values via the abstraction layer."""
@@ -83,6 +85,7 @@ class TestApplicationState(unittest.TestCase):
         
         self.assertIn("detector", params)
         self.assertEqual(params["detector"], "motion")
+        self.assertEqual(params["static_image_mode"], "stretch")
 
 if __name__ == "__main__":
     unittest.main()

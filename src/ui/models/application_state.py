@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict
+from pathlib import Path
 import tkinter as tk
 
 from src.engine.config.conversion_config import ConversionConfig
@@ -11,6 +12,17 @@ from src.ui.interfaces import IModel
 logger = logging.getLogger(__name__)
 
 APP_VERSION = "7.1.0"
+
+
+def default_workshop_dir() -> str:
+    """Sensible, visible default location for in-progress conversions.
+
+    Unlike the previous hidden ``dmd_tmp`` folders created next to each
+    source file, this is a single, discoverable location the user can see
+    and change at any time via the output-folder picker.
+    """
+    return str(Path.home() / "Documents" / "DMD_GIF_Converter" / "Werkstatt")
+
 
 class ApplicationState(IModel):
     def __init__(self):
@@ -36,6 +48,17 @@ class ApplicationState(IModel):
         self._create_tk_vars_for_config(self.auto_action_config, "v_action_")
         self._create_tk_vars_for_config(self.export_config, "v_")
         self._create_tk_vars_for_config(self.display_config, "v_")
+
+        # The workshop folder (v_output_dir) gets a sensible, visible default
+        # so conversions work out of the box without silently writing beside
+        # source files. The user can still change it at any time.
+        if not self.v_output_dir.get().strip():
+            workshop_dir = default_workshop_dir()
+            try:
+                Path(workshop_dir).mkdir(parents=True, exist_ok=True)
+                self.v_output_dir.set(workshop_dir)
+            except OSError as exc:
+                logger.warning("Could not create default workshop folder %s: %s", workshop_dir, exc)
         
         # Add aliases or special vars
         self.v_search_keyword = tk.StringVar(value="")

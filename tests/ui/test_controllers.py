@@ -60,6 +60,7 @@ class TestConversionController(unittest.TestCase):
         with patch("src.engine.conversion.core.process_file") as mock_pf, \
              patch("src.engine.conversion.services.job_expander.expand_conversion_jobs",
                    return_value=[("iid1", "/a.mp4", {}, "")]), \
+             patch("os.path.isdir", return_value=True), \
              patch("os.makedirs"):
             mock_pf.return_value = (True, "ok")
             cc._run_conversion(["/a.mp4"])
@@ -88,10 +89,19 @@ class TestConversionController(unittest.TestCase):
         with patch("src.engine.conversion.core.process_file") as mock_pf, \
              patch("src.engine.conversion.services.job_expander.expand_conversion_jobs",
                    return_value=[("iid1", "/a.mp4", {}, "")]), \
+             patch("os.path.isdir", return_value=True), \
              patch("os.makedirs"):
             mock_pf.return_value = (False, "FFmpeg failed")
             cc._run_conversion(["/a.mp4"])
         self.assertTrue(cc._view.after.called)
+
+    def test_run_conversion_requires_existing_output_folder(self):
+        cc = self._make()
+        cc._model.get.side_effect = lambda k, d=None: {"v_output_dir": ""}.get(k, d)
+        with patch("src.engine.conversion.core.process_file") as mock_pf:
+            cc._run_conversion(["/a.mp4"])
+        mock_pf.assert_not_called()
+        cc._view.after.assert_called_once()
 
 
 class TestPreviewController(unittest.TestCase):

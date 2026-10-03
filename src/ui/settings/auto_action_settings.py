@@ -120,6 +120,43 @@ class AutoActionSettingsPanel(ctk.CTkFrame):
         )
         self._action_detector_menu.grid(row=0, column=1, sticky="w", padx=4)
         _add_dep(self._action_detector_menu)
+
+        framing_row = ctk.CTkFrame(parent, fg_color="transparent")
+        framing_row.pack(fill="x", padx=10, pady=2)
+        framing_row.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(
+            framing_row, text="Subject framing", width=145, anchor="w",
+            font=ctk.CTkFont(size=12),
+        ).grid(row=0, column=0, padx=(4, 6))
+        self._subject_framing_menu = ctk.CTkOptionMenu(
+            framing_row,
+            variable=self.app_state.v_action_subject_framing,
+            values=["group", "primary"],
+            width=200,
+        )
+        self._subject_framing_menu.grid(row=0, column=1, sticky="w", padx=4)
+        ToolTip(
+            self._subject_framing_menu,
+            "Group: frames multiple detected people or moving regions together, "
+            "useful for arcade games with several characters.\n"
+            "Primary: follows the main detected subject or motion region.",
+        )
+        _add_dep(self._subject_framing_menu)
+
+        self._cb_dynamic_zoom_all_sizes = ctk.CTkCheckBox(
+            parent,
+            text="Enable dynamic zoom for all DMD sizes",
+            variable=self.app_state.v_action_dynamic_zoom_all_sizes,
+            font=ctk.CTkFont(size=12),
+            text_color="#aaddaa",
+        )
+        self._cb_dynamic_zoom_all_sizes.pack(anchor="w", padx=14, pady=(2, 4))
+        ToolTip(
+            self._cb_dynamic_zoom_all_sizes,
+            "Dynamic zoom is automatic for 32×64 portrait output. "
+            "Enable this option to also use it for other output sizes.",
+        )
+        _add_dep(self._cb_dynamic_zoom_all_sizes)
         
         fallback_row = ctk.CTkFrame(parent, fg_color="transparent")
         fallback_row.pack(fill="x", padx=14, pady=(0, 4))
@@ -205,7 +242,7 @@ class AutoActionSettingsPanel(ctk.CTkFrame):
 
         _add_dep(adv_slider(parent, "Zoom max", self.app_state.v_action_zoom_max, 1.0, 3.0,
                    "{:.2f}", "×", steps=100,
-                   tooltip_text="Maximum dynamic zoom factor allowed.\nDefault 1.0x maintains the widest possible shot to ensure scene readability on tight DMD resolutions."))
+                   tooltip_text="Maximum dynamic zoom factor for portrait DMD layouts such as 32×64.\nThe camera zooms in only as far as needed to frame detected subjects, then smoothly zooms back out when they are not detected."))
         
         pad_sl = adv_slider(parent, "ROI padding", self.app_state.v_action_padding, 0.0, 0.6,
                    "{:.2f}", "", steps=60, 

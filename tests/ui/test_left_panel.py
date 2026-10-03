@@ -26,3 +26,28 @@ def test_left_panel_add_files(mock_askfiles):
     with patch.object(panel, '_batch_insert') as mock_add:
         panel.add_files()
         assert mock_add.call_count == 1
+
+
+class TestTreeSelectPublishesSelectionCount:
+    def test_empty_selection_publishes_zero(self):
+        panel = _make_panel()
+        panel._tree.selection.return_value = ()
+        with patch('src.ui.panels.left_panel.EventBus') as mock_bus:
+            panel._on_tree_select()
+        mock_bus.publish.assert_called_once_with(
+            mock_bus.publish.call_args[0][0], {"count": 0}
+        )
+
+    def test_multi_selection_publishes_count(self):
+        panel = _make_panel()
+        panel._tree.selection.return_value = ("iid1", "iid2")
+        panel._tree.focus.return_value = "iid2"
+        panel._file_data = {"iid1": "/a.gif", "iid2": "/b.gif"}
+        panel.app_state.v_per_gif_config.get.return_value = False
+        panel.app_state.v_auto_color_enabled.get.return_value = False
+        panel._adv_refresh_job = None
+        with patch('src.ui.panels.left_panel.EventBus') as mock_bus, \
+             patch.object(panel, '_load_preview'):
+            panel._on_tree_select()
+        found = [c for c in mock_bus.publish.call_args_list if c[0][1] == {"count": 2}]
+        assert found, "Expected a SELECTION_CHANGED publish with count=2"

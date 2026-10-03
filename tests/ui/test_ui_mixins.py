@@ -47,6 +47,13 @@ class TestAddFileRaw(unittest.TestCase):
         panel._add_file_raw("/foo/" + "x"*30 + ".mp4")
         self.assertIn("\u2026", panel._tree.insert.call_args[1]["text"])
 
+    def test_media_kind_classifies_images_and_videos(self):
+        self.assertEqual(LeftPanel._media_kind("/media/cover.png"), "image")
+        self.assertEqual(LeftPanel._media_kind("/media/cover.jpg"), "image")
+        self.assertEqual(LeftPanel._media_kind("/media/clip.gif"), "video")
+        self.assertEqual(LeftPanel._media_kind("/media/clip.mp4"), "video")
+        self.assertEqual(LeftPanel._media_kind("/media/readme.txt"), "other")
+
 
 class TestBatchInsert(unittest.TestCase):
     def test_single_batch(self):
@@ -67,6 +74,39 @@ class TestBatchInsert(unittest.TestCase):
         panel._batch_insert([], 0)
         panel._tree.insert.assert_not_called()
 
+    def test_select_first_imported_file(self):
+        panel = _make_left_panel()
+        panel._tree.insert.return_value = "iid1"
+        panel._on_tree_select = MagicMock()
+        panel._batch_insert(["/cache/nes-game-video.mp4"], 0, select_first=True)
+        panel._tree.selection_set.assert_called_once_with("iid1")
+        panel._tree.focus.assert_called_once_with("iid1")
+        panel._on_tree_select.assert_called_once_with()
+
+
+class TestQueueFilter(unittest.TestCase):
+    def test_filter_hides_without_deleting_and_restores_rows(self):
+        panel = _make_left_panel()
+        panel._file_data = {
+            "image": "/cache/cover.png",
+            "video": "/cache/trailer.mp4",
+        }
+        panel._queue_filter = MagicMock()
+        panel._queue_filter.get.return_value = "Bilder"
+        panel._tree.selection.return_value = ()
+
+        panel._apply_queue_filter()
+
+        panel._tree.move.assert_called_once_with("image", "", "end")
+        panel._tree.detach.assert_called_once_with("video")
+        panel._tree.delete.assert_not_called()
+
+        panel._tree.reset_mock()
+        panel._queue_filter.get.return_value = "Alle Medien"
+        panel._apply_queue_filter()
+        panel._tree.move.assert_any_call("image", "", "end")
+        panel._tree.move.assert_any_call("video", "", "end")
+
 
 class TestUpdateCount(unittest.TestCase):
     def test_zero(self):
@@ -76,13 +116,13 @@ class TestUpdateCount(unittest.TestCase):
         panel = _make_left_panel()
         panel._file_data["iid1"] = "/a.mp4"
         panel._update_count()
-        panel._count_lbl.configure.assert_called_with(text="1 file")
+        panel._count_lbl.configure.assert_called_with(text="1 Datei")
 
     def test_many(self):
         panel = _make_left_panel()
         panel._file_data = {"a": "/a.mp4", "b": "/b.mp4", "c": "/c.mp4"}
         panel._update_count()
-        panel._count_lbl.configure.assert_called_with(text="3 files")
+        panel._count_lbl.configure.assert_called_with(text="3 Dateien")
 
 
 class TestOnFilesAddedToQueue(unittest.TestCase):

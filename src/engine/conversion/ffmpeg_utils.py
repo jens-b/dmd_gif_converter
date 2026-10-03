@@ -198,6 +198,16 @@ def snap_to_clean_fps(fps: float, fps_min: float = 10.0, fps_max: float = 25.0) 
 
 def get_metadata(file_path: str):
     """Extract width, height, playback FPS and duration from any video using ffprobe."""
+    if str(file_path).lower().endswith(".png"):
+        try:
+            from PIL import Image
+            with Image.open(file_path) as image:
+                width, height = image.size
+            return width, height, 25.0, 1.0
+        except Exception as e:
+            logger.warning("Could not read PNG metadata (%s): %s", file_path, e)
+            return None, None, 25.0, 0.0
+
     cmd = [
         "ffprobe", "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=width,height,r_frame_rate,avg_frame_rate,nb_frames",
@@ -237,5 +247,4 @@ def get_metadata(file_path: str):
     except Exception as e:
         logger.warning(f"Could not read metadata ({file_path}): {e}")
         return None, None, 25.0, 0.0
-
 

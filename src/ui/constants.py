@@ -34,7 +34,11 @@ MODE_DESC = {
     "cinema":    "Live-action films, real footage",
     "custom":    "Manual control of every parameter",
 }
-
+STATIC_IMAGE_MODE_LABELS = {
+    "Strecken": "stretch",
+    "Einpassen": "fit",
+    "Ausfüllen (Beschnitt)": "fill",
+}
 
 
 

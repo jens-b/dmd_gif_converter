@@ -1,5 +1,5 @@
 {
-  "task_id": "D135A",
+  "task_id": "54CA6",
   "file_info": {
     "filename": "platformer_jump_3.gif",
     "video_width": 498,
@@ -19,11 +19,11 @@
   "raw_signals": {
     "tall_ratio": 1.534136546184739,
     "fill_ratio": 0.4360730593607306,
-    "body_aspect": 0.8451327433628318,
+    "body_aspect": 0.834061135371179,
     "floor_in_lower": true,
-    "floor_var_score": 0.091096238331033,
-    "x_variance": 0.042554921931604976,
-    "y_variance": 0.01179904598155438
+    "floor_var_score": 0.09097902741538641,
+    "x_variance": 0.04199744611392873,
+    "y_variance": 0.011696094142973158
   },
   "decisions": {
     "face_priority": {

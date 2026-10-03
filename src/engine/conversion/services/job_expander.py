@@ -24,7 +24,7 @@ def expand_conversion_jobs(
     expanded_jobs = []
     
     for iid, src_path in files:
-        if not auto_cutter:
+        if not auto_cutter or Path(src_path).suffix.lower() == ".png":
             # Single standard job
             expanded_jobs.append((iid, src_path, params, None))
             continue
