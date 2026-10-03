@@ -197,11 +197,13 @@ class TestMultiSizeConversion:
 
         tasks = captured["tasks"]
         assert len(tasks) == 6
-        names = sorted(os.path.basename(t[1]) for t in tasks if t[0] == "/a.mp4")
-        assert names == ["a_dmd_128x32.gif", "a_dmd_256x64.gif", "a_dmd_64x32.gif"]
-        overrides = {os.path.basename(t[1]): t[5] for t in tasks if t[0] == "/a.mp4"}
-        assert overrides["a_dmd_64x32.gif"] == {"target_width": 64, "target_height": 32}
-        assert overrides["a_dmd_256x64.gif"] == {"target_width": 256, "target_height": 64}
+        rel = sorted(
+            os.path.relpath(t[1], tmp_path).replace(os.sep, "/") for t in tasks if t[0] == "/a.mp4"
+        )
+        assert rel == ["GIF_128x32/a_dmd.gif", "GIF_256x64/a_dmd.gif", "GIF_64x32/a_dmd.gif"]
+        overrides = {os.path.basename(os.path.dirname(t[1])): t[5] for t in tasks if t[0] == "/a.mp4"}
+        assert overrides["GIF_64x32"] == {"target_width": 64, "target_height": 32}
+        assert overrides["GIF_256x64"] == {"target_width": 256, "target_height": 64}
 
     def test_no_size_ticked_keeps_single_task_without_overrides(self, tmp_path):
         panel = _make_panel()
@@ -215,10 +217,10 @@ class TestMultiSizeConversion:
         assert os.path.basename(task[1]) == "a_dmd.gif"
         assert task[5] is None
 
-    def test_size_suffix_is_applied_to_custom_output_name(self, tmp_path):
+    def test_size_folder_is_applied_to_custom_output_name(self, tmp_path):
         panel = _make_panel()
         lp = _with_multi_select(panel, tmp_path, {"a": "/a.mp4"})
         panel.app_state.v_per_gif_config.get.return_value = True
         lp._per_gif_configs = {"a": {"custom_out_name": "logo.gif"}}
-        out = panel._out_path("/a.mp4", iid="a", size_suffix="_64x64")
-        assert os.path.basename(out) == "logo_64x64.gif"
+        out = panel._out_path("/a.mp4", iid="a", size_dir="GIF_64x64")
+        assert os.path.relpath(out, tmp_path).replace(os.sep, "/") == "GIF_64x64/logo.gif"

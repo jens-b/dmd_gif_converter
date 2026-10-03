@@ -6,7 +6,7 @@ import customtkinter as ctk
 from pathlib import Path
 from tkinter import messagebox
 
-from src.ui.constants import MULTI_SIZE_PRESETS, STATIC_IMAGE_MODE_LABELS
+from src.ui.constants import MULTI_SIZE_PRESETS, SIZE_DIR_PATTERN, STATIC_IMAGE_MODE_LABELS
 from src.ui.events.event_bus import EventBus, EventType
 from src.ui.i18n import tr
 
@@ -357,6 +357,9 @@ class MiddlePanel(ctk.CTkFrame):
             return
             
         name = Path(path).name
+        size_dir = Path(path).parent.name
+        if SIZE_DIR_PATTERN.fullmatch(size_dir):
+            name = f"{size_dir}/{name}"
         disp = (name[:20] + "…") if len(name) > 22 else name
         
         score_val = score_result.get("score", 0)
@@ -509,7 +512,13 @@ class MiddlePanel(ctk.CTkFrame):
             if not os.path.exists(src_path):
                 processed.append(iid)
                 continue
-            destination = os.path.join(final_dir, os.path.basename(src_path))
+            target_dir = final_dir
+            size_dir = Path(src_path).parent.name
+            if SIZE_DIR_PATTERN.fullmatch(size_dir):
+                # Keep the size subfolder (e.g. 64x32/) so equal names don't collide
+                target_dir = os.path.join(final_dir, size_dir)
+                os.makedirs(target_dir, exist_ok=True)
+            destination = os.path.join(target_dir, os.path.basename(src_path))
             same_path = os.path.abspath(src_path) == os.path.abspath(destination)
             if same_path:
                 already_in_destination += 1

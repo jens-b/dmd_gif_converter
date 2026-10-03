@@ -241,8 +241,8 @@ class PreviewPanel(ctk.CTkFrame):
     #  CONVERSION LOGIC
     # ══════════════════════════════════════════════════════════════════════════
 
-    def _out_path(self, src, iid=None, reserved: set[str] | None = None, size_suffix: str = ""):
-        base = Path(src).stem + "_dmd" + size_suffix + ".gif"
+    def _out_path(self, src, iid=None, reserved: set[str] | None = None, size_dir: str = ""):
+        base = Path(src).stem + "_dmd.gif"
         if (
             iid
             and self._left_panel
@@ -254,11 +254,12 @@ class PreviewPanel(ctk.CTkFrame):
                 base = Path(custom_name).name
                 if Path(base).suffix.lower() != ".gif":
                     base = f"{Path(base).stem}.gif"
-                if size_suffix:
-                    base = f"{Path(base).stem}{size_suffix}.gif"
         out_dir = self.app_state.v_output_dir.get().strip()
         if not out_dir or not os.path.isdir(out_dir):
             raise ValueError(tr("Choose an existing output folder before converting."))
+        if size_dir:
+            out_dir = os.path.join(out_dir, size_dir)
+            os.makedirs(out_dir, exist_ok=True)
         destination = Path(out_dir) / base
         counter = 2
         while destination.exists() or (
@@ -291,7 +292,7 @@ class PreviewPanel(ctk.CTkFrame):
                 tasks.append((src, self._out_path(src, iid=iid, reserved=reserved), start_s, end_s, iid, None))
                 continue
             for width, height in sizes:
-                out = self._out_path(src, iid=iid, reserved=reserved, size_suffix=f"_{width}x{height}")
+                out = self._out_path(src, iid=iid, reserved=reserved, size_dir=f"GIF_{width}x{height}")
                 overrides = {"target_width": width, "target_height": height}
                 tasks.append((src, out, start_s, end_s, iid, overrides))
         return tasks
