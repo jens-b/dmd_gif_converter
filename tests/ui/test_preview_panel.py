@@ -65,6 +65,12 @@ class _FakeThread:
         self._target(*self._args)
 
 
+def _tick_sizes(panel, *presets):
+    """tk.BooleanVar is a MagicMock in UI tests, so set each size explicitly."""
+    for preset, var in panel.app_state.multi_size_vars.items():
+        var.get.return_value = preset in presets
+
+
 def _with_multi_select(panel, tmp_path, iids_to_paths):
     lp = MagicMock()
     lp._tree.selection.return_value = list(iids_to_paths.keys())
@@ -72,6 +78,7 @@ def _with_multi_select(panel, tmp_path, iids_to_paths):
     panel._left_panel = lp
     panel.app_state.v_output_dir.get.return_value = str(tmp_path)
     panel.app_state.v_per_gif_config.get.return_value = False
+    _tick_sizes(panel)
     # Avoid popping a real OS file-picker dialog during the test.
     panel._choose_output_folder = MagicMock(return_value=str(tmp_path))
     # _collect_params normally reads real tk widgets; stub it for this unit test.
@@ -115,7 +122,7 @@ class TestConvertSelectedMultiSelection:
 
         tasks = captured["tasks"]
         assert len(tasks) == 1
-        src, out, start_s, end_s, iid = tasks[0]
+        src, out, start_s, end_s, iid, overrides = tasks[0]
         assert src == "/a.mp4"
         assert (start_s, end_s) == (1.0, 2.0)
         assert iid == "iid1"
@@ -139,7 +146,7 @@ class TestConvertSelectedMultiSelection:
         assert len(tasks) == 3
         assert {t[0] for t in tasks} == {"/a.mp4", "/b.mp4", "/c.mp4"}
         # No per-file trim applied when converting a multi-selection.
-        assert all(start_s is None and end_s is None for (_, _, start_s, end_s, _) in tasks)
+        assert all(start_s is None and end_s is None for (_, _, start_s, end_s, _, _) in tasks)
 
     def test_multiple_files_selected_avoid_output_name_collisions(self, tmp_path):
         panel = _make_panel()
@@ -175,3 +182,43 @@ class TestConvertSelectedButtonLabel:
         panel.controls.update_convert_selected_button(3)
         _, kwargs = panel.controls._btn_conv_sel.configure.call_args
         assert "3" in kwargs["text"]
+
+
+class TestMultiSizeConversion:
+    def test_each_file_gets_one_task_per_ticked_size(self, tmp_path):
+        panel = _make_panel()
+        _with_multi_select(panel, tmp_path, {"a": "/a.mp4", "b": "/b.mp4"})
+        _tick_sizes(panel, "64x32", "128x32", "256x64")
+        panel._get_trim = MagicMock(return_value=(None, None))
+        captured = {}
+        with patch("src.ui.preview.preview_panel.threading.Thread", _FakeThread), \
+             patch.object(panel, "_run_tasks", side_effect=lambda t, p: captured.update(tasks=t)):
+            panel.convert_selected()
+
+        tasks = captured["tasks"]
+        assert len(tasks) == 6
+        names = sorted(os.path.basename(t[1]) for t in tasks if t[0] == "/a.mp4")
+        assert names == ["a_dmd_128x32.gif", "a_dmd_256x64.gif", "a_dmd_64x32.gif"]
+        overrides = {os.path.basename(t[1]): t[5] for t in tasks if t[0] == "/a.mp4"}
+        assert overrides["a_dmd_64x32.gif"] == {"target_width": 64, "target_height": 32}
+        assert overrides["a_dmd_256x64.gif"] == {"target_width": 256, "target_height": 64}
+
+    def test_no_size_ticked_keeps_single_task_without_overrides(self, tmp_path):
+        panel = _make_panel()
+        _with_multi_select(panel, tmp_path, {"a": "/a.mp4"})
+        panel._get_trim = MagicMock(return_value=(None, None))
+        captured = {}
+        with patch("src.ui.preview.preview_panel.threading.Thread", _FakeThread), \
+             patch.object(panel, "_run_tasks", side_effect=lambda t, p: captured.update(tasks=t)):
+            panel.convert_selected()
+        (task,) = captured["tasks"]
+        assert os.path.basename(task[1]) == "a_dmd.gif"
+        assert task[5] is None
+
+    def test_size_suffix_is_applied_to_custom_output_name(self, tmp_path):
+        panel = _make_panel()
+        lp = _with_multi_select(panel, tmp_path, {"a": "/a.mp4"})
+        panel.app_state.v_per_gif_config.get.return_value = True
+        lp._per_gif_configs = {"a": {"custom_out_name": "logo.gif"}}
+        out = panel._out_path("/a.mp4", iid="a", size_suffix="_64x64")
+        assert os.path.basename(out) == "logo_64x64.gif"

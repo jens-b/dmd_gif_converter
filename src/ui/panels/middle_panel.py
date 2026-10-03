@@ -6,7 +6,7 @@ import customtkinter as ctk
 from pathlib import Path
 from tkinter import messagebox
 
-from src.ui.constants import STATIC_IMAGE_MODE_LABELS
+from src.ui.constants import MULTI_SIZE_PRESETS, STATIC_IMAGE_MODE_LABELS
 from src.ui.events.event_bus import EventBus, EventType
 from src.ui.i18n import tr
 
@@ -94,6 +94,22 @@ class MiddlePanel(ctk.CTkFrame):
         self.app_state.v_static_image_mode.trace_add(
             "write", self._sync_static_image_mode
         )
+
+        ctk.CTkLabel(
+            res_frame, text=tr("Multiple sizes:"), font=ctk.CTkFont(size=11)
+        ).grid(row=3, column=0, sticky="nw", padx=(0, 6), pady=(6, 0))
+        sizes_frame = ctk.CTkFrame(res_frame, fg_color="transparent")
+        sizes_frame.grid(row=3, column=1, sticky="ew", pady=(4, 0))
+        for index, preset in enumerate(MULTI_SIZE_PRESETS):
+            ctk.CTkCheckBox(
+                sizes_frame, text=preset, width=80, checkbox_width=16, checkbox_height=16,
+                font=ctk.CTkFont(size=11), variable=self.app_state.multi_size_vars[preset],
+            ).grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 6), pady=1)
+        ctk.CTkLabel(
+            res_frame,
+            text=tr("Tick one or more sizes: every converted file is created once per ticked size. Nothing ticked = only the resolution selected above."),
+            font=ctk.CTkFont(size=10), text_color="#667788", justify="left", wraplength=260,
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(2, 0))
 
         # Custom inputs
         self._custom_res_frame = ctk.CTkFrame(res_frame, fg_color="transparent")

@@ -1,6 +1,9 @@
 """Additional UI translations (English <-> German), merged into src.ui.i18n."""
 
 EN_TO_DE = {
+    "Multiple sizes:": "Mehrere Größen:",
+    "Tick one or more sizes: every converted file is created once per ticked size. Nothing ticked = only the resolution selected above.":
+        "Eine oder mehrere Größen anhaken: Jede konvertierte Datei wird einmal pro Größe erzeugt. Nichts angehakt = nur die oben gewählte Auflösung.",
     "Text Overlay Settings": "Text-Overlay-Einstellungen",
     "Auto-Action & Video Cutter Settings": "Auto-Action- und Video-Cutter-Einstellungen",
     "All": "Alle",

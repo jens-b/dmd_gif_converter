@@ -241,8 +241,8 @@ class PreviewPanel(ctk.CTkFrame):
     #  CONVERSION LOGIC
     # ══════════════════════════════════════════════════════════════════════════
 
-    def _out_path(self, src, iid=None, reserved: set[str] | None = None):
-        base = Path(src).stem + "_dmd" + ".gif"
+    def _out_path(self, src, iid=None, reserved: set[str] | None = None, size_suffix: str = ""):
+        base = Path(src).stem + "_dmd" + size_suffix + ".gif"
         if (
             iid
             and self._left_panel
@@ -254,6 +254,8 @@ class PreviewPanel(ctk.CTkFrame):
                 base = Path(custom_name).name
                 if Path(base).suffix.lower() != ".gif":
                     base = f"{Path(base).stem}.gif"
+                if size_suffix:
+                    base = f"{Path(base).stem}{size_suffix}.gif"
         out_dir = self.app_state.v_output_dir.get().strip()
         if not out_dir or not os.path.isdir(out_dir):
             raise ValueError(tr("Choose an existing output folder before converting."))
@@ -268,6 +270,31 @@ class PreviewPanel(ctk.CTkFrame):
         if reserved is not None:
             reserved.add(os.path.normcase(os.path.abspath(destination)).casefold())
         return str(destination)
+
+    def _selected_multi_sizes(self):
+        """Ticked multi-size presets as (width, height) tuples, in preset order."""
+        sizes = []
+        for preset, var in self.app_state.multi_size_vars.items():
+            if var.get():
+                width, height = map(int, preset.split("x"))
+                sizes.append((width, height))
+        return sizes
+
+    def _build_tasks(self, items, trim=(None, None)):
+        """Turn (iid, src) pairs into conversion tasks; one task per ticked size."""
+        reserved: set[str] = set()
+        sizes = self._selected_multi_sizes()
+        tasks = []
+        for iid, src in items:
+            start_s, end_s = trim
+            if not sizes:
+                tasks.append((src, self._out_path(src, iid=iid, reserved=reserved), start_s, end_s, iid, None))
+                continue
+            for width, height in sizes:
+                out = self._out_path(src, iid=iid, reserved=reserved, size_suffix=f"_{width}x{height}")
+                overrides = {"target_width": width, "target_height": height}
+                tasks.append((src, out, start_s, end_s, iid, overrides))
+        return tasks
 
     def _choose_output_folder(self):
         current = self.app_state.v_output_dir.get().strip()
@@ -307,23 +334,18 @@ class PreviewPanel(ctk.CTkFrame):
         if not self._choose_output_folder():
             return
         self._cancel_event.clear()
-        reserved: set[str] = set()
         if len(items) == 1:
             # Single file: honor the trim range currently shown in the preview.
-            iid, src = items[0]
-            out = self._out_path(src, iid=iid, reserved=reserved)
+            src = items[0][1]
             start_s, end_s = self._get_trim()
             trim_info = f"  trim [{start_s:.1f}s → {end_s:.1f}s]" if start_s is not None else ""
             self._log(f"▶  Convert: {Path(src).name}{trim_info}")
-            tasks = [(src, out, start_s, end_s, iid)]
+            tasks = self._build_tasks(items, trim=(start_s, end_s))
         else:
             # Multiple files selected: trim only applies to the one file shown in
             # the preview, so it is not meaningful here — convert each in full.
-            tasks = [
-                (src, self._out_path(src, iid=iid, reserved=reserved), None, None, iid)
-                for iid, src in items
-            ]
-            self._log(f"▶  Converting {len(tasks)} selected file(s)…")
+            tasks = self._build_tasks(items)
+            self._log(f"▶  Converting {len(items)} selected file(s)…")
         threading.Thread(
             target=self._run_tasks, args=(tasks, self._collect_params()), daemon=True
         ).start()
@@ -339,12 +361,8 @@ class PreviewPanel(ctk.CTkFrame):
         if not self._choose_output_folder():
             return
         self._cancel_event.clear()
-        reserved = set()
-        tasks = [
-            (path, self._out_path(path, iid=iid, reserved=reserved), None, None, iid)
-            for iid, path in lp._file_data.items()
-        ]
-        self._log(f"⚡  Converting {len(tasks)} file(s)…")
+        tasks = self._build_tasks(list(lp._file_data.items()))
+        self._log(f"⚡  Converting {len(tasks)} job(s)…")
         threading.Thread(
             target=self._run_tasks, args=(tasks, self._collect_params()), daemon=True
         ).start()
@@ -434,10 +452,16 @@ class PreviewPanel(ctk.CTkFrame):
             self.app_state.v_per_gif_config.get()
         )
 
+        # A source file leaves the list only after all of its size variants are done
+        pending_per_iid: dict = {}
+        failed_iids: set = set()
+        for task in tasks:
+            pending_per_iid[task[4]] = pending_per_iid.get(task[4], 0) + 1
+
         def _process_one(task_tuple):
             with _wid_lock:
                 _wid_seq[0] += 1
-            src, out, start_s, end_s, iid = task_tuple
+            src, out, start_s, end_s, iid, overrides = task_tuple
             if self._cancel_event.is_set():
                 return
 
@@ -447,6 +471,8 @@ class PreviewPanel(ctk.CTkFrame):
                 task_params = dict(params)
                 if per_gif_enabled and iid in lp._per_gif_configs:
                     task_params.update(lp._per_gif_configs[iid])
+                if overrides:
+                    task_params.update(overrides)
                 if lp:
                     self.after(0, lambda _i=iid: lp._set_file_status(_i, "converting"))
                 success, msg = process_file(
@@ -461,8 +487,6 @@ class PreviewPanel(ctk.CTkFrame):
                     if mp:
                         self.after(0, lambda _o=out, _r=score_result:
                                    mp._add_converted_file(_o, _r))
-                    if lp:
-                        self.after(0, lambda _i=iid: lp._remove_specific_file(_i))
                 elif lp:
                     new_status = "idle" if self._cancel_event.is_set() else "error"
                     self.after(0, lambda _i=iid, _status=new_status: lp._set_file_status(_i, _status))
@@ -474,6 +498,11 @@ class PreviewPanel(ctk.CTkFrame):
                     self.after(0, lambda _i=iid: lp._set_file_status(_i, "error"))
 
             with done_lock:
+                if not success:
+                    failed_iids.add(iid)
+                pending_per_iid[iid] -= 1
+                if lp and pending_per_iid[iid] == 0 and iid not in failed_iids:
+                    self.after(0, lambda _i=iid: lp._remove_specific_file(_i))
                 if success:
                     success_count[0] += 1
                 elif not self._cancel_event.is_set():

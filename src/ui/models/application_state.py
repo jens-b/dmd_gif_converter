@@ -7,6 +7,7 @@ from src.engine.config.conversion_config import ConversionConfig
 from src.engine.config.auto_action_config import AutoActionConfig
 from src.engine.config.export_config import ExportConfig
 from src.engine.config.display_config import DisplayConfig
+from src.ui.constants import MULTI_SIZE_PRESETS
 from src.ui.interfaces import IModel
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,11 @@ class ApplicationState(IModel):
         self._var_map["v_target_width"] = self.v_target_width
         self._var_map["v_target_height"] = self.v_target_height
         
+        # Multi-size conversion: not part of _var_map, as it expands jobs instead of params
+        self.multi_size_vars: Dict[str, tk.BooleanVar] = {
+            preset: tk.BooleanVar(value=False) for preset in MULTI_SIZE_PRESETS
+        }
+
         self._create_tk_vars_for_config(self.conversion_config, "v_")
         self._create_tk_vars_for_config(self.auto_action_config, "v_action_")
         self._create_tk_vars_for_config(self.export_config, "v_")
