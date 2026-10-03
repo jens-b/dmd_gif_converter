@@ -22,7 +22,7 @@ class ExportSettingsPanel(ctk.CTkFrame):
         self._target_preset_menu = ctk.CTkOptionMenu(
             tiling_preset_row,
             variable=self.app_state.v_target_preset,
-            values=["64x32 (½x1)", "64x64 (½x2)", "128x32 (1x1)", "256x32 (2x1)", "128x64 (1x2)", "256x64 (2x2)", "Original", "Custom"],
+            values=["32x64 (¼x2)", "64x32 (½x1)", "64x64 (½x2)", "128x32 (1x1)", "256x32 (2x1)", "128x64 (1x2)", "256x64 (2x2)", "Original", "Custom"],
             command=self._on_target_preset_change,
             width=200,
         )

@@ -25,7 +25,7 @@ RESOLUTION_REFRESH_DELAY_MS = 150
 
 # Sizes selectable for one-pass multi-resolution conversion
 SIZE_DIR_PATTERN = re.compile(r"GIF_\d+x\d+")
-MULTI_SIZE_PRESETS = ("64x32", "64x64", "128x32", "256x32", "128x64", "256x64")
+MULTI_SIZE_PRESETS = ("32x64", "64x32", "64x64", "128x32", "256x32", "128x64", "256x64")
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
